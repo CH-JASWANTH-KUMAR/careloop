@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-page: #f8fafc; /* Slate 50 */
+    --surface-card: #ffffff;
+    --surface-muted: #f1f5f9; /* Slate 100 */
+    --surface-hover: #e2e8f0; /* Slate 200 */
+    
+    --border-subtle: #e2e8f0; /* Slate 200 */
+    --border-strong: #cbd5e1; /* Slate 300 */
+    
+    --text-primary: #0f172a; /* Slate 900 */
+    --text-secondary: #475569; /* Slate 600 */
+    --text-muted: #64748b; /* Slate 500 */
+    
+    /* Semantic Status Tokens */
+    --status-urgent: #ef4444; /* Red 500 */
+    --status-urgent-bg: #fef2f2;
+    --status-urgent-border: #fecaca;
+    
+    --status-waiting: #d97706; /* Amber 600 */
+    --status-waiting-bg: #fffbeb;
+    --status-waiting-border: #fde68a;
+    
+    --status-healthy: #059669; /* Emerald 600 */
+    --status-healthy-bg: #ecfdf5;
+    --status-healthy-border: #a7f3d0;
+    
+    --status-transit: #0284c7; /* Sky 600 */
+    --status-transit-bg: #f0f9ff;
+    --status-transit-border: #bae6fd;
+
+    --brand-dark: #0f172a;
+    --brand-accent: #0f766e; /* Deep clinical teal */
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.011em;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Operational clean scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Subtle glass/operational borders */
+.subtle-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+}
+
+.subtle-card:hover {
+  border-color: #cbd5e1;
+}
+
+.mono-tag {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
 }
