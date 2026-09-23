@@ -40,9 +40,9 @@ export default function RootLayout({
             <Sidebar />
 
             {/* Main Application Column */}
-            <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
+            <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-16 lg:pb-0 overflow-x-hidden">
               <Header />
-              <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
+              <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
                 <CareContinuityBanner />
                 {children}
               </main>

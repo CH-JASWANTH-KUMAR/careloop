@@ -29,6 +29,7 @@ const totalTests = 10;
 console.log("\n[SCENARIO 1] Successful Completion: Golden Journey Happy Path...");
 {
   const patient = { id: "mem-anita", name: "Anita Rao", location: "Jubilee Hills, Hyderabad" };
+  assert.strictEqual(patient.name, "Anita Rao");
   const medication = { id: "med-thyronorm", name: "Thyronorm 50 mcg", currentStock: 3, dailyDosage: 1 };
   const requestedDays = 10;
   const shortageDays = Math.max(0, requestedDays - medication.currentStock);

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   PhoneCall,
   ShieldAlert,
@@ -16,9 +17,11 @@ import { useCareLoop } from "@/providers/AppProvider";
 import { gnaniVoiceProvider } from "@/services/voice/VoiceProvider";
 
 export function Header() {
+  const pathname = usePathname();
   const { members, family, logActivity, addTask } = useCareLoop();
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [isVoiceCalling, setIsVoiceCalling] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [voiceCallResult, setVoiceCallResult] = useState<{
     callId: string;
     status: string;
@@ -32,8 +35,32 @@ export function Header() {
     };
   } | null>(null);
 
+  // Close any open header modals automatically when route changes
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setIsEmergencyOpen(false);
+    setIsVoiceModalOpen(false);
+  }
+
   const primaryCoord = members.find((m) => m.id === family?.primaryCoordinatorId);
   const isAvailable = family?.isCoordinatorAvailable ?? true;
+
+  const getPageTitle = (path: string) => {
+    if (path === "/") return "Home";
+    if (path.startsWith("/family")) return "Family";
+    if (path.startsWith("/care")) return "Care";
+    if (path.startsWith("/activity")) return "Activity";
+    if (path.startsWith("/settings")) return "Settings";
+    if (path.startsWith("/continuity")) return "Care Continuity";
+    if (path.startsWith("/appointments")) return "Appointments";
+    if (path.startsWith("/records")) return "Health Records";
+    if (path.startsWith("/medications")) return "Medications";
+    if (path.startsWith("/tasks")) return "Tasks";
+    return "Overview";
+  };
+
+  const pageTitle = getPageTitle(pathname);
 
   const handleSimulateVoiceCheck = async (simulateSymptom = false) => {
     setIsVoiceCalling(true);
@@ -56,6 +83,7 @@ export function Header() {
         transcript: res.transcript,
         extractedOutcome: res.extractedOutcome,
       });
+      setIsVoiceModalOpen(true);
 
       if (simulateSymptom && res.extractedOutcome?.escalationTriggered) {
         addTask({
@@ -89,68 +117,81 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 lg:px-8 py-3 flex items-center justify-between">
+      {/* Left: Page Context & Family Context */}
       <div className="flex items-center gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-semibold text-slate-500 uppercase tracking-wider">
-              Family Circle
-            </span>
+            <span className="text-sm font-bold text-slate-900">{pageTitle}</span>
             <span className="text-slate-300">•</span>
-            <span className="text-sm font-bold text-slate-900">{family?.name || "The Rao Family"}</span>
+            <span className="text-xs font-medium text-slate-600">{family?.name || "The Rao Family"}</span>
           </div>
-          <p className="text-[11px] text-slate-500 hidden sm:block">
-            {family?.primaryCity || "Hyderabad & Bengaluru"} • {members.length} Family Members
+          <p className="text-[11px] text-slate-400 hidden sm:block">
+            {family?.primaryCity || "Hyderabad & Bengaluru"} · {members.length} family members
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      {/* Right: Secondary Actions (Coordinator Availability, Voice Check, Emergency Access) */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
         {/* Care Coordinator Availability Status */}
         <Link
           href="/continuity"
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
             isAvailable
               ? "bg-emerald-50/70 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
-              : "bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200 animate-pulse"
+              : "bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200"
           }`}
           title="Care Continuity Protocol: Coordinator availability status"
         >
           {isAvailable ? (
             <>
               <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden md:inline">{primaryCoord?.name || "Coordinator"}: Available</span>
+              <span className="hidden md:inline">{primaryCoord?.name?.split(" ")[0] || "Coordinator"}: Available</span>
               <span className="md:hidden">Available</span>
             </>
           ) : (
             <>
               <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-              <span className="hidden md:inline">{primaryCoord?.name || "Coordinator"}: Unavailable</span>
+              <span className="hidden md:inline">{primaryCoord?.name?.split(" ")[0] || "Coordinator"}: Unavailable</span>
               <span className="md:hidden font-bold">Handover Needed</span>
             </>
           )}
         </Link>
 
-        {/* Voice Coordination Check Trigger */}
-        <div className="relative inline-block">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleSimulateVoiceCheck(false)}
-            isLoading={isVoiceCalling}
-            className="text-xs border-slate-200 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300"
-            title="Simulate outbound Gnani conversational voice check"
+        {/* If Voice Check is active/completed, show small status indicator without covering the screen */}
+        {voiceCallResult && !isVoiceModalOpen && (
+          <button
+            onClick={() => setIsVoiceModalOpen(true)}
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-800 text-xs font-medium hover:bg-sky-100 transition-colors"
+            title="View Voice Check conversation details"
           >
-            <PhoneCall className="w-3.5 h-3.5 text-sky-600" />
-            <span className="hidden sm:inline">Voice Check (Gnani)</span>
-          </Button>
-        </div>
+            <PhoneCall className="w-3 h-3 text-sky-600" />
+            <span>Voice Check:</span>
+            <span className="font-semibold">
+              {voiceCallResult.extractedOutcome?.escalationTriggered ? "Escalation" : "Stock Confirmed"}
+            </span>
+          </button>
+        )}
+
+        {/* Voice Coordination Check Trigger */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleSimulateVoiceCheck(false)}
+          isLoading={isVoiceCalling}
+          className="text-xs border-slate-200 hover:bg-slate-50 text-slate-700 h-8"
+          title="Simulate outbound Gnani conversational voice check"
+        >
+          <PhoneCall className="w-3.5 h-3.5 text-slate-500" />
+          <span className="hidden sm:inline">Voice Check</span>
+        </Button>
 
         {/* Emergency Info Modal Trigger */}
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsEmergencyOpen(true)}
-          className="text-xs border-red-200 bg-red-50/40 text-red-700 hover:bg-red-100 hover:border-red-300"
+          className="text-xs border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-700 hover:border-red-200 h-8"
         >
           <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
           <span className="hidden sm:inline">Emergency Access</span>
@@ -225,11 +266,11 @@ export function Header() {
         </div>
       </Modal>
 
-      {/* Voice Call Simulation Modal */}
+      {/* Voice Call Simulation Modal - ONLY open when isVoiceModalOpen is explicitly true */}
       <Modal
-        isOpen={!!voiceCallResult}
-        onClose={() => setVoiceCallResult(null)}
-        title="Gnani.ai Voice Coordination Session"
+        isOpen={isVoiceModalOpen && !!voiceCallResult}
+        onClose={() => setIsVoiceModalOpen(false)}
+        title="Gnani Voice Coordination Session"
         description="Outbound conversational AI call in Telugu/English with Anita Rao."
         maxWidth="lg"
       >
@@ -247,7 +288,7 @@ export function Header() {
                 </span>
               </div>
               <span className="font-mono text-[11px] text-sky-700">
-                Rail Ref: {voiceCallResult.callId}
+                Call ID: {voiceCallResult.callId}
               </span>
             </div>
 
@@ -304,8 +345,8 @@ export function Header() {
 
               <Button
                 size="sm"
-                onClick={() => setVoiceCallResult(null)}
-                className="text-xs"
+                onClick={() => setIsVoiceModalOpen(false)}
+                className="text-xs bg-slate-900 text-white"
               >
                 Close Session
               </Button>

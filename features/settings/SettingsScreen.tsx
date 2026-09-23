@@ -51,22 +51,14 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl pb-12">
       {/* Header */}
-      <div className="pb-2 border-b border-slate-200">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-            Platform Configuration
-          </span>
-          <span className="text-xs text-slate-400 font-mono">
-            Provider Rails &amp; Privacy
-          </span>
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Settings &amp; Rail Integrations
+      <div className="pb-3 border-b border-slate-200">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          Settings &amp; Configuration
         </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Manage family authorization thresholds, telephony voice rails, and physical delivery settings.
+        <p className="text-sm text-slate-500 mt-1">
+          How CareLoop is configured for your family: monthly spending limits, voice check preferences, and delivery settings.
         </p>
       </div>
 

@@ -3,508 +3,421 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  Clock,
+  ShieldCheck,
   CheckCircle2,
   Calendar,
   Pill,
   ArrowRight,
-  ShieldCheck,
-  Bot,
-  Truck,
-  ChevronRight,
-  CreditCard,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/Badge";
+import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 
 export function OverviewDashboard() {
   const {
-    family,
     activeUser,
     tasks,
     medications,
     appointments,
+    records,
+    activity,
     members,
-    refillMedication,
     approveTask,
   } = useCareLoop();
 
-  const [refillModalMedId, setRefillModalMedId] = useState<string | null>(null);
-  const [isRefilling, setIsRefilling] = useState(false);
-  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [refillModalOpen, setRefillModalOpen] = useState(false);
+  const [selectedMedId, setSelectedMedId] = useState<string>("med-thyronorm");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Partition actionable state
-  const urgentTasks = tasks.filter((t) => t.status === "NEEDS_ATTENTION");
-
-  const waitingTasks = tasks.filter((t) => t.status === "WAITING_FOR_APPROVAL");
-
-  const inProgressTasks = tasks.filter(
-    (t) => t.status === "IN_PROGRESS" || t.status === "WAITING_FOR_EXTERNAL"
+  // 1. NEEDS ATTENTION: Actions requiring user decision (Red / High Priority)
+  // Low stock medications (<= 5 days) + tasks waiting for approval
+  const lowStockMeds = medications.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE");
+  const approvalTasks = tasks.filter(
+    (t) => t.status === "WAITING_FOR_APPROVAL" || (t.status === "NEEDS_ATTENTION" && t.requiresApproval)
   );
 
-  const upcomingAppointments = appointments
-    .filter((a) => a.status === "UPCOMING")
-    .slice(0, 2);
+  // 2. CARELOOP IS HANDLING: Automated workflows in flight (Green)
+  const confirmedAppointments = appointments.filter((a) => a.status === "UPCOMING").slice(0, 2);
 
-  const lowStockMeds = medications.filter(
-    (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
-  );
+  // 3. UPCOMING: Next consultations & routine care (Grey / Blue)
+  const upcomingAppointments = appointments.filter((a) => a.status === "UPCOMING");
 
-  const handleQuickRefill = async (medId: string) => {
-    setIsRefilling(true);
-    try {
-      const res = await refillMedication(medId);
-      if (res) {
-        setSuccessNotice(
-          `Refill authorized via Pine Labs (₹${res.auth.amount}) & dispatched via Delhivery (AWB: ${res.shipment.awbNumber})`
-        );
-        setTimeout(() => setSuccessNotice(null), 6000);
-      }
-    } finally {
-      setIsRefilling(false);
-      setRefillModalMedId(null);
-    }
+  // 4. RECENTLY COMPLETED: Short confirmation list (Green / Neutral)
+  const recentCompleted = activity
+    .filter(
+      (ev) =>
+        ev.actionType.includes("DELIVERED") ||
+        ev.actionType.includes("CAPTURED") ||
+        ev.actionType.includes("VERIFIED") ||
+        ev.actionType.includes("GRANTED") ||
+        ev.actionType.includes("UPDATED")
+    )
+    .slice(0, 4);
+
+  const handleOpenRefill = (medId: string) => {
+    setSelectedMedId(medId);
+    setRefillModalOpen(true);
   };
 
-  const handleQuickApprove = async (taskId: string) => {
+  const handleQuickApproveTask = async (taskId: string) => {
     await approveTask(taskId);
-    setSuccessNotice("Approval recorded and signed off for The Rao Family.");
-    setTimeout(() => setSuccessNotice(null), 5000);
+    setToastMessage("Task approved and signed off.");
+    setTimeout(() => setToastMessage(null), 4000);
   };
-
-  const selectedRefillMed = medications.find((m) => m.id === refillModalMedId);
-  const selectedRefillPatient = members.find(
-    (m) => m.id === selectedRefillMed?.patientId
-  );
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner / Triage Headline */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-teal-100/70 text-teal-800 border border-teal-200">
-              Command Centre
-            </span>
-            <span className="text-xs text-slate-400 font-mono">
-              Live Health Graph
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Good morning, {activeUser.name.split(" ")[0]}
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Here is what needs your attention right now for{" "}
-            <strong className="text-slate-700 font-semibold">{family?.name || "The Rao Family"}</strong>.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/agent">
-            <Button variant="primary" size="md" className="gap-2 bg-slate-900">
-              <Bot className="w-4 h-4 text-teal-400" />
-              <span>Ask Care Agent</span>
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Success Notification Banner */}
-      {successNotice && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-900 animate-in fade-in slide-in-from-top-2">
+    <div className="space-y-8 max-w-6xl pb-12">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-medium">{successNotice}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{toastMessage}</span>
           </div>
-          <button
-            onClick={() => setSuccessNotice(null)}
-            className="text-emerald-700 hover:text-emerald-900 font-semibold"
-          >
+          <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:underline">
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Primary Triage Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* SECTION 1: TODAY / NEEDS ATTENTION */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Action Required Today
-              </h2>
-            </div>
-            <Badge variant="urgent" showDot>
-              {urgentTasks.length + lowStockMeds.length} items
-            </Badge>
-          </div>
+      {/* Primary Header */}
+      <div className="space-y-1 pb-4 border-b border-slate-200">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          Good morning, {activeUser.name.split(" ")[0]}.
+        </h1>
+        <p className="text-sm text-slate-600">
+          What needs your attention today across the family.
+        </p>
+      </div>
 
-          <div className="space-y-3">
-            {/* Urgent Refill Item */}
+      {/* Contextual Intelligence Quick-Action Bar */}
+      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+          <span>Care Intelligence Shortcuts</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleOpenRefill("med-thyronorm")}
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100/70 text-xs font-medium text-slate-800 transition-colors shadow-2xs text-left"
+          >
+            &ldquo;Make sure Mum has enough medicine for next 10 days&rdquo; →
+          </button>
+          <Link
+            href="/appointments"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100/70 text-xs font-medium text-slate-800 transition-colors shadow-2xs"
+          >
+            &ldquo;Prepare Dad&apos;s cardiology appointment&rdquo; →
+          </Link>
+          <Link
+            href="/records"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100/70 text-xs font-medium text-slate-800 transition-colors shadow-2xs"
+          >
+            &ldquo;Find the latest thyroid lab report&rdquo; →
+          </Link>
+          <Link
+            href="/continuity"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-100/70 text-xs font-medium text-slate-800 transition-colors shadow-2xs"
+          >
+            &ldquo;Who is handling Mum&apos;s care while I&apos;m travelling?&rdquo; →
+          </Link>
+        </div>
+      </div>
+
+      {/* SECTION 1: NEEDS YOUR ATTENTION (Red / Amber) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              Needs Your Attention
+            </h2>
+          </div>
+          <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+            {lowStockMeds.length + approvalTasks.length} Action{lowStockMeds.length + approvalTasks.length !== 1 ? "s" : ""} Required
+          </span>
+        </div>
+
+        {lowStockMeds.length === 0 && approvalTasks.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-1">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+            <div className="text-sm font-bold text-slate-800">You&apos;re all caught up.</div>
+            <p className="text-xs text-slate-500">
+              No pending approvals or medication shortages require human action right now.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Low Stock Medication Cards */}
             {lowStockMeds.map((med) => {
               const patient = members.find((m) => m.id === med.patientId);
               return (
                 <div
                   key={med.id}
-                  className="p-4 rounded-xl subtle-card border-l-4 border-l-red-500 space-y-2.5"
+                  className="p-5 rounded-2xl border-2 border-red-200 bg-white shadow-xs space-y-4 flex flex-col justify-between"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Badge variant="urgent">Refill Due in {med.remainingDays} days</Badge>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          {med.currentStockUnits} tabs left
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-red-50 text-red-700 flex items-center justify-center font-bold text-xs">
+                          <Pill className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900">
+                          {patient?.name}&apos;s thyroid medicine
                         </span>
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900">
-                        {patient?.name}&apos;s {med.name}
-                      </h3>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        {med.dosage} • {med.frequency}
-                      </p>
+                      <Badge variant="urgent" className="text-[10px]">
+                        {med.currentStockUnits} Tablets Left
+                      </Badge>
                     </div>
-                    <div className="w-8 h-8 rounded-lg bg-red-50 text-red-700 flex items-center justify-center shrink-0">
-                      <Pill className="w-4 h-4" />
-                    </div>
-                  </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">
-                      Est. ₹{med.costEstimate} • Apollo Pharmacy
-                    </span>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setRefillModalMedId(med.id)}
-                      className="bg-slate-900 text-xs h-7"
-                    >
-                      Coordinate Refill
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Other Urgent Tasks */}
-            {urgentTasks.map((task) => {
-              const member = members.find((m) => m.id === task.familyMemberId);
-              return (
-                <div
-                  key={task.id}
-                  className="p-4 rounded-xl subtle-card border-l-4 border-l-amber-500 space-y-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Badge variant="warning">{task.priority}</Badge>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          Due {formatDate(task.dueDate)}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-900">{task.title}</h3>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        {task.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">
-                      Patient: <strong className="text-slate-800">{member?.name}</strong>
-                    </span>
-                    <Link href="/tasks">
-                      <span className="text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1">
-                        View Task <ChevronRight className="w-3.5 h-3.5" />
-                      </span>
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-
-            {urgentTasks.length === 0 && lowStockMeds.length === 0 && (
-              <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                No critical actions required today.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* SECTION 2: WAITING FOR APPROVAL / IN PROGRESS */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-600" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Pending Approvals & In Flight
-              </h2>
-            </div>
-            <Badge variant="warning">{waitingTasks.length + inProgressTasks.length}</Badge>
-          </div>
-
-          <div className="space-y-3">
-            {waitingTasks.map((task) => {
-              const reqApprover = members.find(
-                (m) => m.id === task.requiredApprovalFromId
-              );
-              return (
-                <div
-                  key={task.id}
-                  className="p-4 rounded-xl subtle-card border-l-4 border-l-amber-500 bg-amber-50/20 space-y-2.5"
-                >
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Badge variant="warning">Requires Approval</Badge>
-                      <span className="text-[11px] text-slate-500 font-medium">
-                        Approver: {reqApprover?.name || "Family Member"}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-900">{task.title}</h3>
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                      {task.description}
+                    <h3 className="text-base font-bold text-slate-900">
+                      Refill needed in {med.remainingDays} days
+                    </h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      CareLoop found {patient?.name}&apos;s verified prescription for {med.name} and
+                      prepared the refill order with cold-chain delivery.
                     </p>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-500">
-                      Requested by Meera Rao
-                    </span>
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs text-slate-500 font-medium block">
+                        ₹{med.costEstimate} • {med.pharmacyName}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Pine Labs + Delhivery
+                      </span>
+                    </div>
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => handleQuickApprove(task.id)}
-                      className="h-7 text-xs bg-emerald-700 hover:bg-emerald-800"
+                      onClick={() => handleOpenRefill(med.id)}
+                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 h-8 gap-1"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve Now
+                      <span>Review &amp; Approve</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
               );
             })}
 
-            {inProgressTasks.map((task) => {
-              const owner = members.find((m) => m.id === task.ownerId);
+            {/* Approval Tasks */}
+            {approvalTasks.map((t) => {
+              const patient = members.find((m) => m.id === t.familyMemberId);
               return (
-                <div key={task.id} className="p-4 rounded-xl subtle-card space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Badge variant="neutral">In Progress</Badge>
-                        <span className="text-[11px] text-slate-400">
-                          Owner: {owner?.name}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        {task.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {task.description}
-                      </p>
+                <div
+                  key={t.id}
+                  className="p-5 rounded-2xl border-2 border-amber-200 bg-white shadow-xs space-y-4 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-900">
+                        {patient?.name} ({patient?.relationship})
+                      </span>
+                      <Badge variant="warning" className="text-[10px]">
+                        Awaiting Signature
+                      </Badge>
                     </div>
+                    <h3 className="text-base font-bold text-slate-900">{t.title}</h3>
+                    <p className="text-xs text-slate-600 line-clamp-2">{t.description}</p>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-400">
-                      Target: {formatDate(task.dueDate)}
-                    </span>
-                    <Link
-                      href="/appointments"
-                      className="text-teal-700 hover:underline font-medium"
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-500 font-mono">Due: {t.dueDate}</span>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleQuickApproveTask(t.id)}
+                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 h-8"
                     >
-                      Open Prep Packet →
-                    </Link>
+                      Approve Action
+                    </Button>
                   </div>
                 </div>
               );
             })}
-
-            {waitingTasks.length === 0 && inProgressTasks.length === 0 && (
-              <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                No items waiting for external action.
-              </div>
-            )}
           </div>
+        )}
+      </div>
+
+      {/* SECTION 2: CARELOOP IS HANDLING (Green) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              CareLoop Is Handling
+            </h2>
+          </div>
+          <span className="text-xs text-slate-400">Automated Family Workflows</span>
         </div>
 
-        {/* SECTION 3: UPCOMING & LIVE LOGISTICS */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-sky-600" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Upcoming & Physical Rails
-              </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Confirmed Appointment */}
+          {confirmedAppointments.map((apt) => {
+            const patient = members.find((m) => m.id === apt.patientId);
+            return (
+              <div
+                key={apt.id}
+                className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2 flex flex-col justify-between"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{patient?.name}&apos;s Appointment</span>
+                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                      CONFIRMED
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-sm text-slate-900">{apt.doctor}</h4>
+                  <p className="text-xs text-slate-600">
+                    {apt.speciality} • {apt.hospital}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>{apt.date} at {apt.time}</span>
+                  <Link href="/appointments" className="text-teal-700 hover:underline">
+                    View
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Active Logistics Courier */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2 flex flex-col justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Pharmacy Courier</span>
+                <span className="text-[10px] font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
+                  IN TRANSIT
+                </span>
+              </div>
+              <h4 className="font-bold text-sm text-slate-900">Delhivery Express Cold-Chain</h4>
+              <p className="text-xs text-slate-600">
+                Plot 42, Jubilee Hills • Temp-controlled parcel
+              </p>
             </div>
-            <Badge variant="info">{upcomingAppointments.length} events</Badge>
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+              <span className="font-mono">AWB: SANDBOX-AWB-DL-882190</span>
+              <button onClick={() => setRefillModalOpen(true)} className="text-teal-700 hover:underline">
+                Track
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            {/* Live Delhivery Delivery Card */}
-            <div className="p-4 rounded-xl subtle-card border-sky-200 bg-sky-50/20 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-sky-900">
-                  <Truck className="w-4 h-4 text-sky-700" /> Delhivery Healthcare Tracking
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-semibold">
-                  AWB DL928374619
+          {/* Records OCR Pipeline */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2 flex flex-col justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Clinical Vault</span>
+                <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                  MONITORED
                 </span>
               </div>
-              <p className="text-xs text-slate-700 font-medium">
-                Atorvastatin 20mg Monthly Replenishment
+              <h4 className="font-bold text-sm text-slate-900">Prescriptions &amp; Lab Vault</h4>
+              <p className="text-xs text-slate-600">
+                {records.length} records organized • 0 missing documents
               </p>
-              <div className="text-[11px] text-slate-500 space-y-1 bg-white p-2 rounded border border-sky-100">
-                <div className="flex justify-between">
-                  <span>Destination:</span>
-                  <span className="font-semibold text-slate-800">
-                    Jubilee Hills, Hyderabad
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Status:</span>
-                  <span className="font-semibold text-emerald-700">Delivered</span>
-                </div>
-              </div>
             </div>
-
-            {/* Upcoming Appointments */}
-            {upcomingAppointments.map((apt) => {
-              const patient = members.find((m) => m.id === apt.patientId);
-              return (
-                <div key={apt.id} className="p-4 rounded-xl subtle-card space-y-2.5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Badge variant="info">Upcoming Consultation</Badge>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          {formatDate(apt.date)}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-900">
-                        {apt.doctor}
-                      </h3>
-                      <p className="text-xs text-slate-600">
-                        {apt.speciality} • {apt.hospital}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-50 rounded-lg text-xs space-y-1">
-                    <span className="text-[11px] text-slate-500 font-semibold block">
-                      Patient: {patient?.name} ({patient?.relationship})
-                    </span>
-                    <p className="text-slate-600 line-clamp-2">{apt.notes}</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-400">{apt.time}</span>
-                    <Link
-                      href="/appointments"
-                      className="text-teal-700 hover:text-teal-900 font-semibold flex items-center gap-1"
-                    >
-                      Pre-visit Pack <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+              <span>All parameters extracted</span>
+              <Link href="/records" className="text-teal-700 hover:underline">
+                Vault →
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Pine Labs Payment & Refill Confirmation Modal */}
-      <Modal
-        isOpen={!!refillModalMedId}
-        onClose={() => setRefillModalMedId(null)}
-        title="Coordinate Medication Refill"
-        description="Pine Labs payment authorization and Delhivery cold-chain express dispatch."
-        maxWidth="md"
-      >
-        {selectedRefillMed && (
-          <div className="space-y-4">
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
-              <div className="flex justify-between font-medium">
-                <span className="text-slate-500">Patient:</span>
-                <span className="text-slate-900 font-bold">
-                  {selectedRefillPatient?.name} ({selectedRefillPatient?.relationship})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Prescription:</span>
-                <span className="text-slate-900 font-semibold">
-                  {selectedRefillMed.name} ({selectedRefillMed.dosage})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Current Stock:</span>
-                <span className="text-red-700 font-bold font-mono">
-                  {selectedRefillMed.currentStockUnits} tablets (3 days remaining)
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Fulfillment Store:</span>
-                <span className="text-slate-800">{selectedRefillMed.pharmacyName}</span>
-              </div>
-            </div>
-
-            {/* Pine Labs Authorization Card */}
-            <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-bold text-amber-900">
-                  <CreditCard className="w-4 h-4 text-amber-700" /> Pine Labs Authorization
-                </span>
-                <span className="font-mono text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-semibold">
-                  2FA Protected
-                </span>
-              </div>
-              <p className="text-slate-600">
-                You are authorizing a charge of{" "}
-                <strong className="text-slate-900 font-bold">
-                  ₹{selectedRefillMed.costEstimate}
-                </strong>{" "}
-                from the Rao Family health coordination limit (Cap: ₹1,500).
-              </p>
-              <div className="text-[11px] text-slate-500">
-                Approver: <strong className="text-slate-700">{activeUser.name}</strong>
-              </div>
-            </div>
-
-            <div className="p-3 bg-sky-50 rounded-xl border border-sky-200 text-xs text-sky-900 flex items-start gap-2">
-              <Truck className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold block">Automatic Logistics Integration:</span>
-                <p className="text-[11px] text-sky-800 mt-0.5">
-                  Upon authorization, Delhivery Healthcare Express will pick up the package from Apollo Begumpet Hub and deliver directly to Jubilee Hills tomorrow.
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => setRefillModalMedId(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                isLoading={isRefilling}
-                onClick={() => handleQuickRefill(selectedRefillMed.id)}
-                className="bg-slate-900 text-white gap-1.5"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Authorize & Dispatch</span>
-              </Button>
-            </div>
+      {/* SECTION 3: UPCOMING (Grey / Blue) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-slate-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              Upcoming Care Events
+            </h2>
           </div>
-        )}
-      </Modal>
+          <Link href="/appointments" className="text-xs text-slate-600 hover:text-slate-900 font-medium">
+            View Calendar →
+          </Link>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3">
+          {upcomingAppointments.slice(0, 3).map((apt) => {
+            const patient = members.find((m) => m.id === apt.patientId);
+            return (
+              <div
+                key={`up-${apt.id}`}
+                className="flex items-center justify-between py-2 border-b border-slate-100 last:border-b-0 text-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-600">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-900">
+                      {apt.doctor} ({apt.speciality})
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {patient?.name} • {apt.hospital}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono font-medium text-slate-800">{apt.date}</div>
+                  <div className="text-[11px] text-slate-400 font-mono">{apt.time}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SECTION 4: RECENTLY COMPLETED */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              Recently Completed
+            </h2>
+          </div>
+          <Link href="/activity" className="text-xs text-slate-600 hover:text-slate-900 font-medium">
+            Full Audit Log →
+          </Link>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-2xs divide-y divide-slate-100 text-xs">
+          {recentCompleted.map((ev) => (
+            <div key={ev.id} className="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold text-slate-900">{ev.description}</div>
+                {ev.whyExplanation && (
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {ev.whyExplanation}
+                  </div>
+                )}
+              </div>
+              <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Unified Refill Workflow Modal */}
+      <RefillWorkflowModal
+        isOpen={refillModalOpen}
+        onClose={() => setRefillModalOpen(false)}
+        medicationId={selectedMedId}
+      />
     </div>
   );
 }

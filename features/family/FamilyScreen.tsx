@@ -2,495 +2,503 @@
 
 import React, { useState } from "react";
 import {
-  Lock,
   MapPin,
-  ChevronRight,
-  ShieldAlert,
-  GitBranch,
   Pill,
   Calendar,
   FileText,
   ShieldCheck,
+  X,
+  Phone,
+  Clock,
+  Lock,
+  ArrowRight,
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 import { FamilyMember } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Tabs } from "@/components/ui/Tabs";
+import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 
 export function FamilyScreen() {
-  const { members, medications, appointments, records, tasks } = useCareLoop();
+  const { members, medications, appointments, records, tasks, activity } = useCareLoop();
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
-  const [filterTab, setFilterTab] = useState<string>("all");
-
-  const filteredMembers = members.filter((m) => {
-    if (filterTab === "dependents") return m.role === "DEPENDENT";
-    if (filterTab === "coordinators") return m.role === "CARE_COORDINATOR" || m.role === "MEMBER";
-    return true;
-  });
+  const [dossierTab, setDossierTab] = useState<
+    "overview" | "medications" | "appointments" | "records" | "activity" | "permissions"
+  >("overview");
+  const [refillModalOpen, setRefillModalOpen] = useState(false);
+  const [refillMedId, setRefillMedId] = useState("med-thyronorm");
 
   const getMemberMeds = (memberId: string) => medications.filter((m) => m.patientId === memberId);
   const getMemberAppts = (memberId: string) => appointments.filter((a) => a.patientId === memberId);
   const getMemberRecords = (memberId: string) => records.filter((r) => r.patientId === memberId);
   const getMemberTasks = (memberId: string) => tasks.filter((t) => t.familyMemberId === memberId);
+  const getMemberActivity = (memberId: string) =>
+    activity.filter((a) => a.entityId === memberId || a.description.includes(selectedMember?.name.split(" ")[0] || ""));
 
-  // Group members into Family Hierarchy
-  const parents = members.filter((m) => m.relationship === "Mother" || m.relationship === "Father");
-  const coordinators = members.filter((m) => m.role === "CARE_COORDINATOR" || m.role === "OWNER");
+  // Escape key listener for Health Dossier
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedMember) {
+        setSelectedMember(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedMember]);
+
+  // Lock body scroll while dossier modal is open
+  React.useEffect(() => {
+    if (selectedMember) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [selectedMember]);
+
+  const handleOpenDossier = (member: FamilyMember) => {
+    setSelectedMember(member);
+    setDossierTab("overview");
+  };
+
+  const handleTriggerRefillFromDossier = (medId: string) => {
+    setRefillMedId(medId);
+    setRefillModalOpen(true);
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-5xl mx-auto pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-              Family Circle
-            </span>
-            <span className="text-xs text-slate-400 font-mono">Coordinated Unit Model</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            The Rao Family
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Coordinated care structure across Hyderabad, Bengaluru, and Chennai with explicit privacy boundaries.
-          </p>
-        </div>
-
-        <Tabs
-          tabs={[
-            { id: "all", label: "Member Directory", count: members.length },
-            { id: "tree", label: "Coordinated Hierarchy", count: 4 },
-            { id: "dependents", label: "Parents & Dependents", count: parents.length },
-            { id: "coordinators", label: "Care Coordinators", count: coordinators.length },
-          ]}
-          activeTab={filterTab}
-          onChange={setFilterTab}
-        />
+      <div className="pb-4 border-b border-slate-200">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          The Rao Family
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Who you are responsible for, their care leads, and active health dossiers.
+        </p>
       </div>
 
-      {/* Security & Permissions Disclaimer */}
-      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3 text-xs text-slate-600">
-        <Lock className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <strong className="text-slate-800">Permissions Policy:</strong> Health records and payment authorizations are restricted to designated coordinators. Sensitive medical records are not broadcasted without explicit family role permission.
-        </div>
-      </div>
+      {/* Member Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {members.map((member) => {
+          const memberMeds = getMemberMeds(member.id);
+          const memberAppts = getMemberAppts(member.id);
+          const memberTasks = getMemberTasks(member.id);
+          const urgentMeds = memberMeds.filter((m) => m.remainingDays <= 5);
 
-      {/* VIEW MODE 1: Coordinated Family Hierarchy Tree View */}
-      {filterTab === "tree" ? (
-        <div className="space-y-6">
-          <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-teal-950 text-white flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <GitBranch className="w-4 h-4 text-teal-400" />
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider">
-                  The Rao Family Care Graph
-                </h2>
-                <p className="text-[11px] text-slate-300">
-                  Visual relationship mapping connecting elderly parents with remote adult coordinators.
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-800/80 text-teal-200 border border-teal-700/60">
-              Coordinated Care Unit
-            </span>
-          </div>
-
-          <div className="space-y-6">
-            {/* Branch 1: Parents / Dependents */}
-            <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
-                    Parents &amp; In-Home Dependents (Hyderabad Residence)
-                  </h3>
-                </div>
-                <span className="text-xs text-slate-500">Living with Grandparents • Jubilee Hills</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {parents.map((p) => {
-                  const meds = getMemberMeds(p.id);
-                  const appts = getMemberAppts(p.id);
-                  const recs = getMemberRecords(p.id);
-                  const memberTasks = getMemberTasks(p.id);
-
-                  return (
-                    <div key={p.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-slate-900 text-sm">{p.name}</h4>
-                            <span className="text-xs text-slate-500">({p.relationship}, {p.age}y)</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <MapPin className="w-3 h-3 text-slate-400" /> {p.location}
-                          </p>
-                        </div>
-                        <Badge variant="warning">Dependent</Badge>
-                      </div>
-
-                      {/* Care Duties & Summary */}
-                      <p className="text-[11px] text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200/60 leading-relaxed">
-                        <strong>Care Focus:</strong> {p.healthStatusSummary}
-                      </p>
-
-                      {/* Nested Entities */}
-                      <div className="space-y-1.5 text-[11px]">
-                        {/* Meds */}
-                        <div className="bg-white p-2 rounded border border-slate-200/80 flex items-center justify-between">
-                          <span className="text-slate-600 flex items-center gap-1.5 font-medium">
-                            <Pill className="w-3.5 h-3.5 text-teal-600" /> Active Medicines
-                          </span>
-                          <span className="font-semibold text-slate-900">
-                            {meds.map((m) => `${m.name} (${m.remainingDays}d left)`).join(", ")}
-                          </span>
-                        </div>
-
-                        {/* Appointments */}
-                        <div className="bg-white p-2 rounded border border-slate-200/80 flex items-center justify-between">
-                          <span className="text-slate-600 flex items-center gap-1.5 font-medium">
-                            <Calendar className="w-3.5 h-3.5 text-blue-600" /> Next Consultation
-                          </span>
-                          <span className="font-semibold text-slate-900">
-                            {appts[0] ? `${appts[0].doctor} (${appts[0].date})` : "None scheduled"}
-                          </span>
-                        </div>
-
-                        {/* Reports */}
-                        <div className="bg-white p-2 rounded border border-slate-200/80 flex items-center justify-between">
-                          <span className="text-slate-600 flex items-center gap-1.5 font-medium">
-                            <FileText className="w-3.5 h-3.5 text-purple-600" /> Clinical Vault
-                          </span>
-                          <span className="font-semibold text-slate-900">
-                            {recs.length} verified hospital documents
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 flex items-center justify-between border-t border-slate-200/60">
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {memberTasks.length} active tasks
+          return (
+            <div
+              key={member.id}
+              className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-3">
+                {/* Member Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-base shadow-xs ${
+                        member.role === "OWNER"
+                          ? "bg-slate-900"
+                          : member.role === "CARE_COORDINATOR"
+                          ? "bg-teal-700"
+                          : "bg-emerald-600"
+                      }`}
+                    >
+                      {member.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-bold text-base text-slate-900">{member.name}</h2>
+                        <span className="text-xs text-slate-500">
+                          {member.relationship} · {member.age}
                         </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedMember(p)}
-                          className="h-7 text-xs px-2.5"
-                        >
-                          <span>Full Dossier</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </Button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Branch 2: Adult Children / Coordinators */}
-            <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
-                    Care Coordinators &amp; Remote Adult Children
-                  </h3>
-                </div>
-                <span className="text-xs text-slate-500">Autonomous Execution with Consent Gates</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {coordinators.map((c) => (
-                  <div key={c.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-900 text-sm">{c.name}</h4>
-                          <span className="text-xs text-slate-500">({c.relationship}, {c.age}y)</span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-400" /> {c.location}
-                        </p>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{member.location}</span>
                       </div>
-                      <Badge variant={c.role === "OWNER" ? "success" : "info"}>
-                        {c.role === "OWNER" ? "Primary Coordinator" : "Backup Coordinator"}
-                      </Badge>
-                    </div>
-
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200/80 text-[11px] space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Assigned Responsibilities
-                      </span>
-                      <p className="text-slate-700 leading-snug">
-                        {c.role === "OWNER"
-                          ? "Overall family care management, Pine Labs financial sign-offs, and hospital dossier prep."
-                          : "Remote emergency escalation contact, voice follow-up reviews, and backup coordination."}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-between border-t border-slate-200/60">
-                      <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> 2FA Consent Enabled
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedMember(c)}
-                        className="h-7 text-xs px-2.5"
-                      >
-                        <span>Role Permissions</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </Button>
                     </div>
                   </div>
-                ))}
+
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold uppercase ${
+                      member.role === "OWNER" || member.role === "CARE_COORDINATOR"
+                        ? "bg-teal-50 text-teal-800 border border-teal-200"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {member.role.replace(/_/g, " ")}
+                  </span>
+                </div>
+
+                {/* What they need / Status Summary */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Current Needs &amp; Responsibilities
+                  </div>
+                  <div className="text-xs text-slate-700 space-y-1">
+                    {member.role === "DEPENDENT" || member.relationship === "Mother" || member.relationship === "Father" ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Pill className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>
+                            {urgentMeds.length > 0 ? (
+                              <strong className="text-red-700">
+                                {urgentMeds[0].name} refill needed ({urgentMeds[0].remainingDays} days left)
+                              </strong>
+                            ) : (
+                              `${memberMeds.length} active medications on track`
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>
+                            {memberAppts.length > 0
+                              ? `Upcoming: ${memberAppts[0].doctor} (${memberAppts[0].speciality})`
+                              : "No immediate appointments"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>{memberTasks.length} active care coordination tasks</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          <span>
+                            {member.role === "OWNER"
+                              ? "Primary family coordinator • Authorization & budget authority"
+                              : "Care coordinator • Medical proxy for prescription management"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <span>{member.permissions.categories.length} permissions verified</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-medium">
+                  {member.role === "DEPENDENT" ? "Care Lead: Arjun Rao" : "Remote Coordination Lead"}
+                </span>
+                <Button
+                  size="sm"
+                  onClick={() => handleOpenDossier(member)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 h-8 gap-1"
+                >
+                  <span>Open Health Dossier</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
               </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        /* VIEW MODE 2: Standard Member Directory Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {filteredMembers.map((member) => {
-            const meds = getMemberMeds(member.id);
-            const appts = getMemberAppts(member.id);
-            const recs = getMemberRecords(member.id);
-            const memberTasks = getMemberTasks(member.id);
+          );
+        })}
+      </div>
 
-            return (
-              <div
-                key={member.id}
-                className="p-5 rounded-xl subtle-card flex flex-col justify-between hover:border-slate-300 transition-all space-y-4"
-              >
+      {/* HEALTH DOSSIER MODAL */}
+      {selectedMember && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedMember(null);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+        >
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Dossier Header */}
+            <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between shrink-0">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg ${
+                    selectedMember.role === "OWNER"
+                      ? "bg-slate-900"
+                      : selectedMember.role === "CARE_COORDINATOR"
+                      ? "bg-teal-700"
+                      : "bg-emerald-600"
+                  }`}
+                >
+                  {selectedMember.name.charAt(0)}
+                </div>
                 <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm border ${member.avatarColor}`}
-                      >
-                        {member.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-base font-bold text-slate-900">{member.name}</h2>
-                          <span className="text-xs text-slate-400 font-mono">({member.relationship})</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-400" /> {member.location}
-                          </span>
-                          <span>•</span>
-                          <span>Age {member.age}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Badge
-                      variant={
-                        member.role === "CARE_COORDINATOR"
-                          ? "info"
-                          : member.role === "DEPENDENT"
-                          ? "warning"
-                          : "neutral"
-                      }
-                    >
-                      {member.role.replace(/_/g, " ")}
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-slate-900">{selectedMember.name}</h3>
+                    <Badge variant="neutral" className="text-[10px]">
+                      {selectedMember.relationship} · {selectedMember.age}y
                     </Badge>
                   </div>
-
-                  {/* Health Summary */}
-                  <p className="text-xs text-slate-600 mt-3 p-2.5 bg-slate-50 rounded-lg leading-relaxed border border-slate-100">
-                    {member.healthStatusSummary}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {selectedMember.location} • Care coordinator: <strong>Arjun Rao (Son, Bengaluru)</strong>
                   </p>
-
-                  {/* Operational Counts */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-center">
-                    <div className="p-2 rounded bg-slate-50 border border-slate-100">
-                      <span className="text-xs font-bold text-slate-900 block font-mono">
-                        {meds.length}
-                      </span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tight">
-                        Medications
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-100">
-                      <span className="text-xs font-bold text-slate-900 block font-mono">
-                        {appts.length}
-                      </span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tight">
-                        Appointments
-                      </span>
-                    </div>
-                    <div className="p-2 rounded bg-slate-50 border border-slate-100">
-                      <span className="text-xs font-bold text-slate-900 block font-mono">
-                        {recs.length}
-                      </span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tight">
-                        Records
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Conditions & Blood Group */}
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
-                      Blood {member.bloodGroup}
-                    </span>
-                    {member.conditions.map((c, i) => (
-                      <span
-                        key={i}
-                        className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Action Button */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">
-                    {memberTasks.length} active coordination tasks
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedMember(member)}
-                    className="text-xs gap-1 border-slate-200 hover:border-slate-400"
-                  >
-                    <span>Health Dossier</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Button>
                 </div>
               </div>
-            );
-          })}
+
+              <button
+                onClick={() => setSelectedMember(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Dossier Tabs */}
+            <div className="px-6 border-b border-slate-200 flex items-center gap-1 bg-white overflow-x-auto shrink-0">
+              {(
+                [
+                  { id: "overview", label: "Overview" },
+                  { id: "medications", label: `Medications (${getMemberMeds(selectedMember.id).length})` },
+                  { id: "appointments", label: `Appointments (${getMemberAppts(selectedMember.id).length})` },
+                  { id: "records", label: `Records (${getMemberRecords(selectedMember.id).length})` },
+                  { id: "activity", label: "Care Activity" },
+                  { id: "permissions", label: "Permissions" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDossierTab(tab.id)}
+                  className={`py-3 px-3.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${
+                    dossierTab === tab.id
+                      ? "border-slate-900 text-slate-900"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Dossier Tab Content */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {/* TAB 1: OVERVIEW */}
+              {dossierTab === "overview" && (
+                <div className="space-y-5">
+                  {/* Current Concerns */}
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                      Active Clinical Concerns
+                    </span>
+                    <div className="text-xs text-slate-800 space-y-1">
+                      {getMemberMeds(selectedMember.id).filter((m) => m.remainingDays <= 5).length > 0 ? (
+                        <div className="flex items-center justify-between">
+                          <p>
+                            <strong>Thyroid Medicine Refill:</strong> Stock reaches only 3 days. Below family safety threshold.
+                          </p>
+                          <Button
+                            size="sm"
+                            onClick={() => handleTriggerRefillFromDossier("med-thyronorm")}
+                            className="bg-slate-900 text-white text-xs h-7 px-2.5"
+                          >
+                            Refill Now
+                          </Button>
+                        </div>
+                      ) : (
+                        <p>No acute concerns. Routine chronic condition tracking active.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary Attributes */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                    <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                      <span className="text-slate-400 block text-[11px]">Blood Group</span>
+                      <strong className="text-slate-900">{selectedMember.bloodGroup}</strong>
+                    </div>
+                    <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                      <span className="text-slate-400 block text-[11px]">Primary Physician</span>
+                      <strong className="text-slate-900">{selectedMember.primaryPhysician || "Dr. Sumathi Reddy"}</strong>
+                    </div>
+                    <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                      <span className="text-slate-400 block text-[11px]">Preferred Language</span>
+                      <strong className="text-slate-900 font-mono">
+                        {selectedMember.preferredLanguage === "te-IN" ? "Telugu (te-IN)" : "English (en-IN)"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Emergency Contact */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Emergency Contact
+                    </span>
+                    <div className="flex items-center justify-between text-xs">
+                      <div>
+                        <div className="font-bold text-slate-900">{selectedMember.emergencyContact.name}</div>
+                        <div className="text-slate-500 text-[11px]">
+                          {selectedMember.emergencyContact.relation} • {selectedMember.emergencyContact.preferredHospital}
+                        </div>
+                      </div>
+                      <a
+                        href={`tel:${selectedMember.emergencyContact.phone}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{selectedMember.emergencyContact.phone}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: MEDICATIONS */}
+              {dossierTab === "medications" && (
+                <div className="space-y-3">
+                  {getMemberMeds(selectedMember.id).map((med) => (
+                    <div
+                      key={med.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs flex items-center justify-between text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-slate-900">{med.name}</span>
+                          <span className="text-slate-500 font-medium">({med.dosage})</span>
+                          <Badge variant={med.remainingDays <= 5 ? "urgent" : "neutral"} className="text-[10px]">
+                            {med.currentStockUnits} tabs left ({med.remainingDays} days)
+                          </Badge>
+                        </div>
+                        <p className="text-slate-500 text-[11px]">
+                          {med.instructions} • Prescribed by {med.prescribingDoctor}
+                        </p>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        onClick={() => handleTriggerRefillFromDossier(med.id)}
+                        className="bg-slate-900 text-white text-xs h-8 px-3"
+                      >
+                        Refill
+                      </Button>
+                    </div>
+                  ))}
+                  {getMemberMeds(selectedMember.id).length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-400">No active medications recorded.</div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: APPOINTMENTS */}
+              {dossierTab === "appointments" && (
+                <div className="space-y-3">
+                  {getMemberAppts(selectedMember.id).map((apt) => (
+                    <div
+                      key={apt.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-1 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-slate-900">{apt.doctor}</span>
+                        <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">
+                          {apt.status}
+                        </span>
+                      </div>
+                      <div className="text-slate-600">
+                        {apt.speciality} • {apt.hospital}
+                      </div>
+                      <div className="text-slate-400 text-[11px] pt-1">
+                        Date: {apt.date} at {apt.time}
+                      </div>
+                    </div>
+                  ))}
+                  {getMemberAppts(selectedMember.id).length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-400">No appointments scheduled.</div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: RECORDS */}
+              {dossierTab === "records" && (
+                <div className="space-y-3">
+                  {getMemberRecords(selectedMember.id).map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs flex items-center justify-between text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-purple-600" />
+                          <span className="font-bold text-slate-900">{rec.title}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {rec.hospital} • {rec.documentType.replace(/_/g, " ")} • Date: {rec.date}
+                        </div>
+                      </div>
+                      <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">
+                        {rec.pipelineStatus}
+                      </span>
+                    </div>
+                  ))}
+                  {getMemberRecords(selectedMember.id).length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-400">No medical records uploaded.</div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 5: ACTIVITY */}
+              {dossierTab === "activity" && (
+                <div className="space-y-2.5">
+                  {getMemberActivity(selectedMember.id).slice(0, 6).map((ev) => (
+                    <div
+                      key={ev.id}
+                      className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{ev.description}</span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {ev.whyExplanation && (
+                        <p className="text-[11px] text-slate-500 italic">Why: &ldquo;{ev.whyExplanation}&rdquo;</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* TAB 6: PERMISSIONS */}
+              {dossierTab === "permissions" && (
+                <div className="space-y-3 text-xs">
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                    <span className="font-bold uppercase tracking-wider text-slate-500 block text-[11px]">
+                      Access &amp; Role Delegation
+                    </span>
+                    <p className="text-slate-600 leading-relaxed">
+                      {selectedMember.name} has the role of <strong>{selectedMember.role.replace(/_/g, " ")}</strong>.
+                      Medical records are encrypted at rest and accessible only by designated family proxies.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                    <span className="font-bold text-slate-800 block">Authorized Categories:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMember.permissions.categories.map((cat) => (
+                        <span key={cat} className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-[10px]">
+                          {cat.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Member Deep Detail Modal */}
-      <Modal
-        isOpen={!!selectedMember}
-        onClose={() => setSelectedMember(null)}
-        title={selectedMember ? `${selectedMember.name} — Full Health Dossier` : ""}
-        description={selectedMember ? `Clinical profile, emergency guidelines, and role permissions.` : ""}
-        maxWidth="lg"
-      >
-        {selectedMember && (
-          <div className="space-y-4">
-            {/* Primary Details Card */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    {selectedMember.name} ({selectedMember.relationship})
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {selectedMember.location} • Age {selectedMember.age}
-                  </p>
-                </div>
-                <Badge variant="info">{selectedMember.role.replace(/_/g, " ")}</Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400 font-semibold block uppercase text-[10px]">
-                    Primary Physician
-                  </span>
-                  <span className="font-semibold text-slate-800">
-                    {selectedMember.primaryPhysician || "Dr. K. S. Rao (Apollo)"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-semibold block uppercase text-[10px]">
-                    Insurance ID
-                  </span>
-                  <span className="font-mono text-slate-800">
-                    {selectedMember.insuranceId || "STAR-HLTH-994827"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Emergency & Allergies */}
-            <div className="p-4 rounded-xl border border-red-200 bg-red-50/20 space-y-2 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-red-900">
-                <ShieldAlert className="w-4 h-4 text-red-600" />
-                <span>Emergency Contact & Critical Protocols</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700 pt-1">
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Attendant:</span>
-                  <span className="font-semibold">
-                    {selectedMember.emergencyContact.name} ({selectedMember.emergencyContact.phone})
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Preferred Hospital:</span>
-                  <span className="font-semibold">
-                    {selectedMember.emergencyContact.preferredHospital}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Known Allergies:</span>
-                  <span className="font-bold text-red-600">
-                    {selectedMember.allergies.join(", ") || "None recorded"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">Blood Group:</span>
-                  <span className="font-bold text-slate-900 font-mono">
-                    {selectedMember.bloodGroup}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Permissions Matrix */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2.5">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-slate-500" /> Granular Permissions Matrix
-              </h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-100">
-                  <span className="text-slate-600">View Medical Records</span>
-                  <span className="font-semibold text-emerald-700">
-                    {selectedMember.permissions.canViewRecords ? "Enabled" : "Restricted"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-100">
-                  <span className="text-slate-600">Approve Payments</span>
-                  <span className="font-semibold text-emerald-700">
-                    {selectedMember.permissions.canApprovePayments ? "Enabled" : "Restricted"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-100">
-                  <span className="text-slate-600">Manage Medications</span>
-                  <span className="font-semibold text-slate-700">
-                    {selectedMember.permissions.canManageMedications ? "Enabled" : "Restricted"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-100">
-                  <span className="text-slate-600">Schedule Appointments</span>
-                  <span className="font-semibold text-slate-700">
-                    {selectedMember.permissions.canCoordinateAppointments ? "Enabled" : "Restricted"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button variant="secondary" onClick={() => setSelectedMember(null)}>
-                Close Dossier
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* Refill Workflow Modal */}
+      <RefillWorkflowModal
+        isOpen={refillModalOpen}
+        onClose={() => setRefillModalOpen(false)}
+        medicationId={refillMedId}
+      />
     </div>
   );
 }
