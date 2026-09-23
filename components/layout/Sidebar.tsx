@@ -173,7 +173,7 @@ export function Sidebar() {
         {/* Secondary Navigation */}
         <div className="pt-4 mt-4 border-t border-slate-100 space-y-1">
           <div className="px-3 pb-1 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold">
-            Preferences
+            Settings
           </div>
           {secondaryNavItems.map((item) => {
             const isActive = isItemActive(item.href);

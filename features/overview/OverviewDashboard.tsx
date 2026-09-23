@@ -9,7 +9,6 @@ import {
   Pill,
   ArrowRight,
   Clock,
-  Sparkles,
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 import { Button } from "@/components/ui/Button";
@@ -69,7 +68,7 @@ export function OverviewDashboard() {
   };
 
   return (
-    <div className="space-y-8 max-w-6xl pb-12">
+    <div className="space-y-8 max-w-5xl pb-12">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between animate-in fade-in">
@@ -93,11 +92,10 @@ export function OverviewDashboard() {
         </p>
       </div>
 
-      {/* Contextual Intelligence Quick-Action Bar */}
-      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-          <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-          <span>Care Intelligence Shortcuts</span>
+      {/* Quick-Action Suggestions */}
+      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+        <div className="text-xs font-semibold text-slate-500">
+          Common actions
         </div>
         <div className="flex flex-wrap gap-2">
           <button

@@ -177,7 +177,7 @@ export function ActivityScreen() {
               { id: "ALL", label: "All Activity" },
               { id: "REFILL", label: "Medication Refills" },
               { id: "AUTHORIZATION", label: "Authorizations" },
-              { id: "PROVIDER", label: "Provider Rails" },
+              { id: "PROVIDER", label: "Provider Actions" },
             ] as const
           ).map((tab) => (
             <button

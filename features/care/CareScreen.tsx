@@ -70,7 +70,7 @@ export function CareScreen() {
   };
 
   return (
-    <div className="space-y-8 max-w-6xl pb-12">
+    <div className="space-y-8 max-w-5xl pb-12">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between">
@@ -125,25 +125,19 @@ export function CareScreen() {
         </div>
       </div>
 
-      {/* REASSURANCE CARD — Nothing Important Is Waiting Silently */}
+      {/* MONITORING CARD */}
       <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div className="w-9 h-9 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0 mt-0.5">
             <ShieldCheck className="w-5 h-5 text-teal-700" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-teal-800">
-                Care Safeguard
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-600"></span>
-            </div>
-            <h2 className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
-              Nothing important is waiting silently.
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">
+              All family care is monitored.
             </h2>
             <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
-              CareLoop monitors all prescriptions, appointments, courier deliveries, and authorizations
-              across {members.length} family members. Any lapse triggers immediate notification.
+              CareLoop tracks prescriptions, appointments, courier deliveries, and authorizations
+              across {members.length} family members. Any gap triggers an immediate notification.
             </p>
           </div>
         </div>
@@ -282,8 +276,8 @@ export function CareScreen() {
                 <h4 className="font-bold text-xs text-slate-900">{t.title}</h4>
                 <p className="text-xs text-slate-600 line-clamp-2">{t.description}</p>
                 <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-mono flex items-center justify-between">
-                  <span>Assigned: CareLoop Engine</span>
-                  <span className="text-sky-700 font-semibold">ACTIVE</span>
+                  <span>Assigned to CareLoop</span>
+                  <span className="text-sky-700 font-semibold">Active</span>
                 </div>
               </div>
             ))}
@@ -371,9 +365,9 @@ export function CareScreen() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 </div>
                 <p className="text-xs text-slate-500 line-clamp-2">{t.description}</p>
-                <div className="pt-2 border-t border-slate-100 text-[10px] text-emerald-700 font-mono font-bold flex items-center justify-between">
-                  <span>RESOLVED</span>
-                  <span>Due {t.dueDate}</span>
+                <div className="pt-2 border-t border-slate-100 text-[10px] text-emerald-700 font-semibold flex items-center justify-between">
+                  <span>Done</span>
+                  <span>{t.dueDate}</span>
                 </div>
               </div>
             ))}
