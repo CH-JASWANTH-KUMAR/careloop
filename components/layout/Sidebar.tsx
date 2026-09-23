@@ -33,6 +33,9 @@ export function Sidebar() {
     (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
   ).length;
 
+  // The store's useSyncExternalStore-based `mounted` flag already ensures
+  // medications and tasks return seed defaults on SSR/first paint, so this
+  // derived value is always hydration-safe without a per-component guard.
   const totalNeedsAttention = urgentTasksCount + urgentMedsCount;
 
   const primaryNavItems: NavItem[] = [

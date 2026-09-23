@@ -58,13 +58,22 @@ export interface Family {
 export type TaskPriority = "URGENT" | "HIGH" | "NORMAL" | "LOW";
 
 export type TaskStatus =
-  | "NEEDS_ATTENTION"
+  // Canonical Phase 6 Task State Machine
+  | "DETECTED"
+  | "PREPARED"
+  | "AWAITING_AUTHORIZATION"
+  | "AUTHORIZED"
   | "IN_PROGRESS"
-  | "WAITING_FOR_APPROVAL"
-  | "WAITING_FOR_EXTERNAL"
+  | "WAITING"
   | "COMPLETED"
+  | "REJECTED"
+  | "DEFERRED"
   | "FAILED"
   | "ESCALATED"
+  // Compatible aliases
+  | "NEEDS_ATTENTION"
+  | "WAITING_FOR_APPROVAL"
+  | "WAITING_FOR_EXTERNAL"
   | "CANCELLED";
 
 export type TaskSource =
@@ -75,6 +84,21 @@ export type TaskSource =
   | "REFILL_TRIGGER"
   | "VOICE_ESCALATION"
   | "CARE_CONTINUITY";
+
+export interface TaskTransition {
+  id: string;
+  timestamp: string;
+  actor: {
+    id: string;
+    name: string;
+    type: "USER" | "CARE_AGENT" | "PROVIDER";
+  };
+  patientId: string;
+  previousState: TaskStatus;
+  newState: TaskStatus;
+  reason: string;
+  resultingAction?: string;
+}
 
 export interface TaskActivityEntry {
   id: string;
@@ -107,6 +131,7 @@ export interface Task {
   requiredApprovalFromId?: string;
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   activityHistory: TaskActivityEntry[];
+  transitions?: TaskTransition[];
   externalRailRef?: ExternalRailRef;
   tags?: string[];
   snoozedUntil?: string;
@@ -246,6 +271,7 @@ export interface ActivityEvent {
     | "VOICE_ESCALATION_TRIGGERED"
     | "DOCUMENT_UPLOADED"
     | "DOCUMENT_VERIFIED"
+    | "APPOINTMENT_COMPLETED"
     | "CARE_CONTINUITY_HANDOVER";
   entityType:
     | "TASK"
@@ -258,5 +284,8 @@ export interface ActivityEvent {
   entityId: string;
   description: string;
   whyExplanation: string; // "Why did CareLoop do this?"
+  source?: "CARE_AGENT" | "USER_PORTAL" | "PINE_LABS_WEBHOOK" | "DELHIVERY_TRACKING" | "GNANI_VOICE" | "CONTINUITY_ENGINE" | string;
+  authorizationInfo?: string;
+  resultSummary?: string;
   metadata?: Record<string, unknown>;
 }

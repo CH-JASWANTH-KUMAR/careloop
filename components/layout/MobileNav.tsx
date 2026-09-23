@@ -17,6 +17,7 @@ export function MobileNav() {
   const pathname = usePathname();
   const { tasks, medications } = useCareLoop();
 
+  // The store returns seed-stable data when !mounted, so this is hydration-safe.
   const urgentCount =
     tasks.filter((t) => t.status === "NEEDS_ATTENTION" || t.status === "WAITING_FOR_APPROVAL").length +
     medications.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE").length;

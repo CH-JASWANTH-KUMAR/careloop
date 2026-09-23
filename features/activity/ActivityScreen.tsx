@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 import { ActivityEvent } from "@/types";
+import { formatDate } from "@/lib/utils";
 
 export function ActivityScreen() {
   const { activity } = useCareLoop();
@@ -110,17 +111,46 @@ export function ActivityScreen() {
           {ev.description}
         </h4>
 
-        {/* Structured 5-Field Audit Line */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-lg bg-slate-50/70 border border-slate-100 text-[11px]">
-          <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">WHO:</span>
-            <span className="text-slate-800 font-medium">{ev.actor.name}</span>
+        {/* Structured 7-Field Provenance Audit Trail */}
+        <div className="rounded-lg bg-slate-50/80 border border-slate-200/80 p-3 space-y-2 text-[11px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-2 border-b border-slate-200/60">
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">WHO</span>
+              <span className="text-slate-900 font-semibold">{ev.actor.name}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">WHAT</span>
+              <span className="text-slate-900 font-semibold">{ev.actionType.replace(/_/g, " ")}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">WHEN</span>
+              <span className="text-slate-900 font-mono">{timeString} ({formatDate(ev.timestamp.split("T")[0])})</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">SOURCE</span>
+              <span className="text-slate-900 font-medium">{ev.source || "CareLoop Core"}</span>
+            </div>
           </div>
-          <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">WHY:</span>
-            <span className="text-slate-700 italic">
-              &ldquo;{ev.whyExplanation || "Proactive family healthcare coordination"}&rdquo;
-            </span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">WHY</span>
+              <span className="text-slate-700 italic leading-snug">
+                &ldquo;{ev.whyExplanation || "Proactive family healthcare coordination"}&rdquo;
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">AUTHORIZATION</span>
+              <span className="text-emerald-800 font-medium">
+                {ev.authorizationInfo || "Verified by authorized user"}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">RESULT</span>
+              <span className="text-slate-800 font-medium">
+                {ev.resultSummary || ev.description}
+              </span>
+            </div>
           </div>
         </div>
       </div>

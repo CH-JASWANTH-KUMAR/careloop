@@ -117,7 +117,7 @@ export function useCareAgent() {
               ownerId: activeUser.id,
               priority: "URGENT",
               dueDate: new Date().toISOString().split("T")[0],
-              status: "NEEDS_ATTENTION",
+              status: "ESCALATED",
               source: "VOICE_ESCALATION",
               tags: ["Urgent Medical", "Escalation"],
             });

@@ -64,26 +64,45 @@ export function RefillWorkflowModal({
   const {
     medications,
     members,
+    tasks,
     activeUser,
     refillMedication,
     advanceShipmentStep,
     completeDelivery,
     resetGoldenJourneyScenario,
     rejectMedicationAuthorization,
+    transitionTaskState,
   } = useCareLoop();
 
   const med = medications.find((m) => m.id === medicationId) || medications[0];
   const patient = members.find((m) => m.id === med?.patientId) || members[0];
+  const activeTask = tasks.find(
+    (t) => t.relatedMedicationId === med?.id || (t.tags?.includes("Refill") && t.familyMemberId === patient?.id)
+  );
 
-  // Workflow state: REVIEW | AUTHORIZING | EXECUTING | TRACKING | COMPLETED | REJECTED | DEFERRED
+  // Workflow state: REVIEW | AUTHORIZING | EXECUTING | TRACKING | COMPLETED | REJECTED | DEFERRED | PAYMENT_FAILED | DELIVERY_FAILED
   const [workflowState, setWorkflowState] = useState<
-    "REVIEW" | "AUTHORIZING" | "EXECUTING" | "TRACKING" | "COMPLETED" | "REJECTED" | "DEFERRED"
-  >(() => (med?.currentStockUnits > 10 ? "COMPLETED" : "REVIEW"));
+    | "REVIEW"
+    | "AUTHORIZING"
+    | "EXECUTING"
+    | "TRACKING"
+    | "COMPLETED"
+    | "REJECTED"
+    | "DEFERRED"
+    | "PAYMENT_FAILED"
+    | "DELIVERY_FAILED"
+  >(() => {
+    if (med?.currentStockUnits > 10) return "COMPLETED";
+    if (activeTask?.status === "WAITING" || activeTask?.status === "WAITING_FOR_EXTERNAL") return "TRACKING";
+    return "REVIEW";
+  });
 
-  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [currentStepIdx, setCurrentStepIdx] = useState(() => (activeTask?.status === "WAITING" ? 1 : 0));
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeReceiptId, setActiveReceiptId] = useState("SANDBOX-REC-PL-4821");
-  const [activeAwbNumber, setActiveAwbNumber] = useState("SANDBOX-AWB-DL-882190");
+  const [activeAwbNumber, setActiveAwbNumber] = useState(
+    () => activeTask?.externalRailRef?.referenceId || "SANDBOX-AWB-DL-882190"
+  );
 
   // Escape key listener
   React.useEffect(() => {
@@ -113,6 +132,15 @@ export function RefillWorkflowModal({
     setIsProcessing(true);
     setWorkflowState("EXECUTING");
 
+    if (activeTask) {
+      transitionTaskState(
+        activeTask.id,
+        "AUTHORIZED",
+        `Human approval granted by ${activeUser.name} for ₹${med.costEstimate} refill.`,
+        "Invoking Pine Labs payment rail"
+      );
+    }
+
     try {
       const res = await refillMedication(med.id);
       if (res) {
@@ -130,6 +158,7 @@ export function RefillWorkflowModal({
       }, 700);
     } catch {
       setIsProcessing(false);
+      setWorkflowState("PAYMENT_FAILED");
     }
   };
 
@@ -159,12 +188,52 @@ export function RefillWorkflowModal({
   };
 
   const handleReject = () => {
+    if (activeTask) {
+      transitionTaskState(
+        activeTask.id,
+        "REJECTED",
+        "Coordinator verified stock was already purchased offline.",
+        "Refill order canceled"
+      );
+    }
     rejectMedicationAuthorization("Coordinator noted that stock was already purchased offline");
     setWorkflowState("REJECTED");
   };
 
   const handleAskLater = () => {
+    if (activeTask) {
+      transitionTaskState(
+        activeTask.id,
+        "DEFERRED",
+        "Coordinator deferred approval ('Ask me later'). Follow-up reminder queued.",
+        "Reminder scheduled in 12 hours"
+      );
+    }
     setWorkflowState("DEFERRED");
+  };
+
+  const handleSimulatePaymentFailure = () => {
+    if (activeTask) {
+      transitionTaskState(
+        activeTask.id,
+        "FAILED",
+        "Pine Labs gateway reported authorization timeout / card declined.",
+        "Transaction rolled back"
+      );
+    }
+    setWorkflowState("PAYMENT_FAILED");
+  };
+
+  const handleSimulateDeliveryFailure = () => {
+    if (activeTask) {
+      transitionTaskState(
+        activeTask.id,
+        "FAILED",
+        "Delhivery courier reported security gate access denied or recipient unavailable.",
+        "Shipment returned to hub"
+      );
+    }
+    setWorkflowState("DELIVERY_FAILED");
   };
 
   const handleReset = () => {
@@ -328,6 +397,15 @@ export function RefillWorkflowModal({
                   >
                     Ask me later
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    onClick={handleSimulatePaymentFailure}
+                    disabled={isProcessing}
+                    className="text-xs text-amber-800 hover:bg-amber-100/50"
+                  >
+                    Simulate Payment Decline
+                  </Button>
                 </div>
               </div>
             </div>
@@ -452,6 +530,15 @@ export function RefillWorkflowModal({
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Button>
                   <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSimulateDeliveryFailure}
+                    disabled={isProcessing}
+                    className="text-xs text-amber-800 hover:bg-amber-100/50"
+                  >
+                    Simulate Delivery Exception
+                  </Button>
+                  <Button
                     variant="primary"
                     size="sm"
                     onClick={handleDeliverNow}
@@ -565,6 +652,37 @@ export function RefillWorkflowModal({
                 whatCareLoopCanDo: "Saved refill draft with pre-calculated shortage details.",
                 whatHumanNeedsToDo: "Approve before stock runs out in 3 days to avoid treatment discontinuation.",
                 onRetry: () => setWorkflowState("REVIEW"),
+              }}
+            />
+          )}
+
+          {/* PAYMENT FAILED STATE */}
+          {workflowState === "PAYMENT_FAILED" && (
+            <FailureStateCard
+              details={{
+                type: "PAYMENT_FAILED",
+                whatHappened: `Pine Labs pre-authorized payment gateway declined ₹${med.costEstimate} for ${med.name}.`,
+                why: "Payment authorization failed: Bank gateway timeout or terminal declined the transaction.",
+                whatCareLoopCanDo: "Payment transaction rolled back safely. No duplicate charges occurred.",
+                whatHumanNeedsToDo: "Verify card balance or switch to secondary UPI payment rail in Settings.",
+                onRetry: () => setWorkflowState("REVIEW"),
+              }}
+            />
+          )}
+
+          {/* DELIVERY FAILED STATE */}
+          {workflowState === "DELIVERY_FAILED" && (
+            <FailureStateCard
+              details={{
+                type: "DELIVERY_FAILED",
+                whatHappened: `Delhivery Healthcare express courier reported a delivery exception in Jubilee Hills.`,
+                why: "Delivery exception: Security gate access denied or recipient unavailable.",
+                whatCareLoopCanDo: "Cold-chain package returned safely to Apollo Begumpet Central Hub (4.2°C temperature maintained).",
+                whatHumanNeedsToDo: "Confirm gate security pass or schedule evening re-dispatch window.",
+                onRetry: () => {
+                  setCurrentStepIdx(2);
+                  setWorkflowState("TRACKING");
+                },
               }}
             />
           )}

@@ -10,6 +10,8 @@ import {
   Appointment,
   ActivityEvent,
   TaskStatus,
+  TaskTransition,
+  TaskActivityEntry,
   ExtractedMetadata,
 } from "@/types";
 import {
@@ -161,10 +163,25 @@ export function useCareLoopStore() {
 
   const logActivity = useCallback(
     (event: Omit<ActivityEvent, "id" | "timestamp">) => {
+      const defaultSource =
+        event.source ||
+        (event.actor.type === "CARE_AGENT"
+          ? "CARE_AGENT"
+          : event.actor.type === "PROVIDER_PINELABS"
+          ? "PINE_LABS_WEBHOOK"
+          : event.actor.type === "PROVIDER_DELHIVERY"
+          ? "DELHIVERY_TRACKING"
+          : event.actor.type === "PROVIDER_GNANI"
+          ? "GNANI_VOICE"
+          : "USER_PORTAL");
+
       const newEvent: ActivityEvent = {
         ...event,
         id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         timestamp: new Date().toISOString(),
+        source: defaultSource,
+        authorizationInfo: event.authorizationInfo || "Verified by authorized user",
+        resultSummary: event.resultSummary || event.description,
       };
       setActivity((prev) => {
         const next = [newEvent, ...prev];
@@ -278,24 +295,55 @@ export function useCareLoopStore() {
     [family, members, medications, tasks, records, appointments, activity, logActivity, saveState]
   );
 
-  const updateTaskStatus = useCallback(
-    (taskId: string, newStatus: TaskStatus, note?: string) => {
+  const resumeCareCoordination = useCallback(
+    (originalCoordinatorId = "mem-arjun") => {
+      takeOverCareCoordination(
+        originalCoordinatorId,
+        "Primary care coordinator resumed active family healthcare management."
+      );
+    },
+    [takeOverCareCoordination]
+  );
+
+  const transitionTaskState = useCallback(
+    (
+      taskId: string,
+      newState: TaskStatus,
+      reason: string,
+      resultingAction?: string,
+      customActor?: { id: string; name: string; type: "USER" | "CARE_AGENT" | "PROVIDER" }
+    ) => {
+      const actor = customActor || { id: activeUser.id, name: activeUser.name, type: "USER" as const };
+      let updatedTask: Task | undefined;
+
       setTasks((prev) => {
         const next = prev.map((t) => {
           if (t.id === taskId) {
-            const historyEntry = {
+            const transition: TaskTransition = {
+              id: `tr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              timestamp: new Date().toISOString(),
+              actor,
+              patientId: t.familyMemberId,
+              previousState: t.status,
+              newState,
+              reason,
+              resultingAction,
+            };
+            const historyEntry: TaskActivityEntry = {
               id: `act-${Date.now()}`,
               timestamp: new Date().toISOString(),
-              actorName: activeUser.name,
-              actorType: "USER" as const,
-              action: `Changed status to ${newStatus.replace(/_/g, " ")}`,
-              note,
+              actorName: actor.name,
+              actorType: actor.type,
+              action: `Transitioned from ${t.status.replace(/_/g, " ")} to ${newState.replace(/_/g, " ")}`,
+              note: reason,
             };
-            return {
+            updatedTask = {
               ...t,
-              status: newStatus,
+              status: newState,
+              transitions: [transition, ...(t.transitions || [])],
               activityHistory: [historyEntry, ...t.activityHistory],
             };
+            return updatedTask;
           }
           return t;
         });
@@ -304,15 +352,49 @@ export function useCareLoopStore() {
       });
 
       logActivity({
-        actor: { id: activeUser.id, name: activeUser.name, type: "USER" },
+        actor: {
+          id: actor.id,
+          name: actor.name,
+          type:
+            actor.type === "CARE_AGENT"
+              ? "CARE_AGENT"
+              : actor.type === "PROVIDER"
+              ? "PROVIDER_DELHIVERY"
+              : "USER",
+        },
         actionType: "TASK_STATUS_CHANGED",
         entityType: "TASK",
         entityId: taskId,
-        description: `${activeUser.name} updated task status to ${newStatus.replace(/_/g, " ")}.`,
-        whyExplanation: note || `User manual status update to ${newStatus.replace(/_/g, " ")}.`,
+        description: `${actor.name} transitioned task status to ${newState.replace(/_/g, " ")}.`,
+        whyExplanation: reason,
+        source:
+          actor.type === "CARE_AGENT"
+            ? "CARE_AGENT"
+            : actor.type === "PROVIDER"
+            ? "DELHIVERY_TRACKING"
+            : "USER_PORTAL",
+        authorizationInfo:
+          newState === "AUTHORIZED" || newState === "COMPLETED"
+            ? `Authorized by ${activeUser.name}`
+            : undefined,
+        resultSummary: resultingAction || `Task state updated to ${newState}`,
       });
+
+      return updatedTask;
     },
     [activeUser, family, members, medications, records, appointments, activity, activeUserId, logActivity, saveState]
+  );
+
+  const updateTaskStatus = useCallback(
+    (taskId: string, newStatus: TaskStatus, note?: string) => {
+      transitionTaskState(
+        taskId,
+        newStatus,
+        note || `User manual status update to ${newStatus.replace(/_/g, " ")}.`,
+        `Task status updated to ${newStatus}`
+      );
+    },
+    [transitionTaskState]
   );
 
   // Snooze Task
@@ -567,7 +649,7 @@ export function useCareLoopStore() {
         responsibleMemberName: activeUser.name,
       });
 
-      // 4. Update task state: set to WAITING_FOR_EXTERNAL until delivery completes
+      // 4. Update task state: set to WAITING until delivery completes
       setTasks((prev) => {
         let matched = false;
         const next = prev.map((t) => {
@@ -577,9 +659,20 @@ export function useCareLoopStore() {
             t.status !== "COMPLETED"
           ) {
             matched = true;
+            const refillTransition: TaskTransition = {
+              id: `tr-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              actor: { id: activeUser.id, name: activeUser.name, type: "USER" },
+              patientId: patient.id,
+              previousState: t.status,
+              newState: "WAITING",
+              reason: "Refill authorized by coordinator. Pine Labs payment captured and Delhivery cold-chain transit dispatched.",
+              resultingAction: `Dispatched via Delhivery (AWB: ${shipment.awbNumber})`,
+            };
             return {
               ...t,
-              status: "WAITING_FOR_EXTERNAL" as TaskStatus,
+              status: "WAITING" as TaskStatus,
+              transitions: [refillTransition, ...(t.transitions || [])],
               externalRailRef: {
                 type: "DELHIVERY" as const,
                 referenceId: shipment.awbNumber,
@@ -610,7 +703,7 @@ export function useCareLoopStore() {
             ownerId: activeUser.id,
             priority: "HIGH",
             dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split("T")[0],
-            status: "WAITING_FOR_EXTERNAL",
+            status: "WAITING",
             source: "REFILL_TRIGGER",
             relatedMedicationId: med.id,
             externalRailRef: {
@@ -619,6 +712,18 @@ export function useCareLoopStore() {
               status: shipment.status,
               lastUpdated: new Date().toISOString(),
             },
+            transitions: [
+              {
+                id: `tr-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                actor: { id: activeUser.id, name: activeUser.name, type: "USER" },
+                patientId: patient.id,
+                previousState: "AWAITING_AUTHORIZATION",
+                newState: "WAITING",
+                reason: "Refill authorized by coordinator. Pine Labs payment captured and Delhivery cold-chain transit dispatched.",
+                resultingAction: `Dispatched via Delhivery (AWB: ${shipment.awbNumber})`,
+              },
+            ],
             activityHistory: [
               {
                 id: `act-${Date.now()}`,
@@ -644,6 +749,9 @@ export function useCareLoopStore() {
         entityId: auth.authorizationId,
         description: `₹${med.costEstimate} captured for ${med.name} refill at ${med.pharmacyName}. Receipt #${captureResult.receipt.receiptId}.`,
         whyExplanation: `Authorized by ${activeUser.name} within family limit of ₹${family.monthlySpendingLimit} to prevent medication disruption.`,
+        source: "PINE_LABS_WEBHOOK",
+        authorizationInfo: `Authorized by ${activeUser.name} (Monthly spending limit: ₹${family.monthlySpendingLimit})`,
+        resultSummary: `Payment captured. Receipt #${captureResult.receipt.receiptId}.`,
       });
 
       logActivity({
@@ -653,6 +761,9 @@ export function useCareLoopStore() {
         entityId: shipment.awbNumber,
         description: `Shipment created: ${shipment.awbNumber}. Cold-chain transit to ${patient.name} (${patient.location}).`,
         whyExplanation: `Automated logistics dispatch scheduled to deliver within 24h before patient's current stock depletes.`,
+        source: "DELHIVERY_TRACKING",
+        authorizationInfo: `Signed off with pharmacy dispatch instructions`,
+        resultSummary: `AWB ${shipment.awbNumber} generated. Apollo Central Hub pickup scheduled.`,
       });
 
       return { auth, shipment, receipt: captureResult.receipt };
@@ -676,9 +787,23 @@ export function useCareLoopStore() {
         const next = prev.map((t) => {
           if (t.externalRailRef?.referenceId === awbNumber) {
             linkedMedId = t.relatedMedicationId;
+            const courierTransition: TaskTransition = {
+              id: `tr-${Date.now()}`,
+              timestamp: now.toISOString(),
+              actor: { id: "prov-delhivery", name: "Delhivery Logistics", type: "PROVIDER" },
+              patientId: t.familyMemberId,
+              previousState: t.status,
+              newState: (isDelivered ? "COMPLETED" : "IN_PROGRESS") as TaskStatus,
+              reason: `Courier status updated: ${updatedShipment.status}.`,
+              resultingAction: isDelivered
+                ? "Physical doorstep delivery verified. Inventory auto-replenished."
+                : "Package in transit with cold-chain monitoring.",
+            };
+
             return {
               ...t,
               status: (isDelivered ? "COMPLETED" : "IN_PROGRESS") as TaskStatus,
+              transitions: [courierTransition, ...(t.transitions || [])],
               externalRailRef: {
                 ...t.externalRailRef,
                 status: updatedShipment.status,
@@ -744,6 +869,9 @@ export function useCareLoopStore() {
           entityId: awbNumber,
           description: `Doorstep delivery completed for ${targetPatientName} (AWB: ${awbNumber}). Package handed over with cold-chain seal intact.`,
           whyExplanation: "Doorstep delivery completed. Physical handover confirmed.",
+          source: "DELHIVERY_TRACKING",
+          authorizationInfo: "Verified by recipient OTP & doorstep signature",
+          resultSummary: `Delivered to ${targetPatientName} at Jubilee Hills (AWB: ${awbNumber})`,
         });
 
         logActivity({
@@ -753,6 +881,9 @@ export function useCareLoopStore() {
           entityId: targetMedId,
           description: `Automatic stock replenishment: Thyronorm 50 mcg increased by 60 tablets (now 63 days remaining).`,
           whyExplanation: "Closed-loop fulfillment completed. Inventory automatically synced upon verified physical doorstep delivery.",
+          source: "CARE_AGENT",
+          authorizationInfo: `Authorized by ${activeUser.name} (Refill Plan #RX-ANITA)`,
+          resultSummary: "Stock replenished to 63 tablets (63 days). Next refill date set.",
         });
       } else {
         const latestStep = updatedShipment.trackingHistory[updatedShipment.trackingHistory.length - 1];
@@ -763,12 +894,15 @@ export function useCareLoopStore() {
           entityId: awbNumber,
           description: `AWB ${awbNumber} status: ${updatedShipment.status} at ${latestStep?.location || "Transit Hub"}.`,
           whyExplanation: latestStep?.description || "Live tracking update from courier network.",
+          source: "DELHIVERY_TRACKING",
+          authorizationInfo: "Logistics checkpoint scan",
+          resultSummary: `Courier status: ${updatedShipment.status}`,
         });
       }
 
       return updatedShipment;
     },
-    [family, members, medications, records, appointments, activity, activeUserId, logActivity, saveState]
+    [family, members, medications, records, appointments, activity, activeUserId, activeUser.name, logActivity, saveState]
   );
 
   const completeDelivery = useCallback(
@@ -866,6 +1000,85 @@ export function useCareLoopStore() {
       updateRecordExtraction(recordId, {});
     },
     [updateRecordExtraction]
+  );
+
+  const completeAppointment = useCallback(
+    (appointmentId: string, consultationSummary?: string) => {
+      const appt = appointments.find((a) => a.id === appointmentId);
+      if (!appt) return null;
+
+      const patient = members.find((m) => m.id === appt.patientId);
+
+      // 1. Update appointment status to COMPLETED
+      setAppointments((prev) => {
+        const next = prev.map((a) => (a.id === appointmentId ? { ...a, status: "COMPLETED" as const } : a));
+        saveState(family, members, medications, tasks, records, next, activity, activeUserId);
+        return next;
+      });
+
+      // 2. Automatically generate post-visit follow-up task
+      const followUpTitle = `Post-Visit Review: ${appt.doctor} (${patient?.name || "Patient"})`;
+      const followUpDesc =
+        consultationSummary ||
+        `Review consultation notes with ${appt.doctor} (${appt.speciality}) and verify updated prescriptions or follow-up tests.`;
+
+      const followUpTask: Task = {
+        id: `task-followup-${Date.now()}`,
+        title: followUpTitle,
+        description: followUpDesc,
+        familyMemberId: appt.patientId,
+        ownerId: family.primaryCoordinatorId,
+        priority: "NORMAL",
+        dueDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString().split("T")[0],
+        status: "PREPARED",
+        source: "DOCTOR_FOLLOWUP",
+        relatedAppointmentId: appt.id,
+        activityHistory: [
+          {
+            id: `act-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            actorName: "CareLoop Agent",
+            actorType: "CARE_AGENT",
+            action: "Generated post-consultation follow-up workflow",
+          },
+        ],
+        transitions: [
+          {
+            id: `tr-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            actor: { id: "care-agent", name: "CareLoop Agent", type: "CARE_AGENT" },
+            patientId: appt.patientId,
+            previousState: "DETECTED",
+            newState: "PREPARED",
+            reason: `Automated post-visit follow-up protocol initiated following completion of consultation with ${appt.doctor}.`,
+            resultingAction: "Follow-up task created for coordinator review",
+          },
+        ],
+        tags: ["Follow-up", "Appointment"],
+      };
+
+      setTasks((prev) => {
+        const next = [followUpTask, ...prev];
+        saveState(family, members, medications, next, records, appointments, activity, activeUserId);
+        return next;
+      });
+
+      // 3. Log activity event with 7-tuple provenance
+      logActivity({
+        actor: { id: activeUser.id, name: activeUser.name, type: "USER" },
+        actionType: "APPOINTMENT_COMPLETED",
+        entityType: "APPOINTMENT",
+        entityId: appointmentId,
+        description: `Consultation with ${appt.doctor} marked attended and completed.`,
+        whyExplanation: `Completed clinical consultation for ${patient?.name || "patient"}. Post-visit follow-up packet generated.`,
+        source: "USER_PORTAL",
+        authorizationInfo: `Confirmed by ${activeUser.name}`,
+        resultSummary: `Appointment marked COMPLETED. Created follow-up task: "${followUpTitle}".`,
+      });
+
+      return followUpTask;
+    },
+    [appointments, members, family, medications, tasks, records, activity, activeUserId, activeUser, logActivity, saveState]
   );
 
   // Family Onboarding flow creation
@@ -969,21 +1182,45 @@ export function useCareLoopStore() {
     } catch {}
   }, []);
 
+  // ─── Hydration-safe data layer ──────────────────────────────────────────────
+  // The useState lazy initialisers above read localStorage on the first
+  // synchronous client render, which can differ from what the server computed
+  // (which always uses seed data because `window` is undefined in Node).
+  // To guarantee the server HTML === first client paint for every consumer
+  // (FamilyScreen, OverviewDashboard, CareScreen, Header …) we expose the
+  // seed defaults while `mounted` is false.  After React commits to the DOM,
+  // `useSyncExternalStore` flips `mounted` to true and all slices switch to
+  // the real localStorage-backed state in a single synchronous re-render.
+  // This is the single authoritative fix — no per-screen suppressions needed.
+  const stableFamily       = mounted ? family       : initialFamily;
+  const stableMembers      = mounted ? members      : initialFamilyMembers;
+  const stableMedications  = mounted ? medications  : initialMedications;
+  const stableTasks        = mounted ? tasks        : initialTasks;
+  const stableRecords      = mounted ? records      : initialHealthRecords;
+  const stableAppointments = mounted ? appointments : initialAppointments;
+  const stableActivity     = mounted ? activity     : initialActivityEvents;
+  const stableActiveUser   = mounted
+    ? (members.find((m) => m.id === activeUserId) || members[2])
+    : (initialFamilyMembers.find((m) => m.id === activeUserId) || initialFamilyMembers[2]);
+
   return {
     mounted,
-    family,
-    members,
-    medications,
-    tasks,
-    records,
-    appointments,
-    activity,
-    activeUser,
+    family:       stableFamily,
+    members:      stableMembers,
+    medications:  stableMedications,
+    tasks:        stableTasks,
+    records:      stableRecords,
+    appointments: stableAppointments,
+    activity:     stableActivity,
+    activeUser:   stableActiveUser,
     activeUserId,
     switchActiveUser,
     toggleCoordinatorAvailability,
     takeOverCareCoordination,
+    resumeCareCoordination,
     updateTaskStatus,
+    transitionTaskState,
+    completeAppointment,
     snoozeTask,
     escalateTask,
     delegateTask,

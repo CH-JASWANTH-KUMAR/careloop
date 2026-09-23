@@ -8,6 +8,7 @@ import {
   FileText,
   CheckCircle2,
   ClipboardList,
+  Pill,
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 import { Appointment } from "@/types";
@@ -18,9 +19,10 @@ import { Tabs } from "@/components/ui/Tabs";
 import { formatDate } from "@/lib/utils";
 
 export function AppointmentsScreen() {
-  const { appointments, members, records } = useCareLoop();
+  const { appointments, members, records, medications, completeAppointment } = useCareLoop();
   const [filterTab, setFilterTab] = useState<string>("UPCOMING");
   const [selectedApptForPrep, setSelectedApptForPrep] = useState<Appointment | null>(null);
+  const [completionNotice, setCompletionNotice] = useState<string | null>(null);
 
   const filteredAppts = appointments.filter((a) => {
     if (filterTab === "UPCOMING") return a.status === "UPCOMING";
@@ -60,6 +62,19 @@ export function AppointmentsScreen() {
         />
       </div>
 
+      {/* Completion Toast Notification */}
+      {completionNotice && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{completionNotice}</span>
+          </div>
+          <button onClick={() => setCompletionNotice(null)} className="text-emerald-700 hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Safety Notice */}
       <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
         <ClipboardList className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
@@ -87,7 +102,7 @@ export function AppointmentsScreen() {
                         {patient?.name} ({patient?.relationship})
                       </span>
                       <span>•</span>
-                      <Badge variant="info">{appt.status}</Badge>
+                      <Badge variant={appt.status === "COMPLETED" ? "neutral" : "info"}>{appt.status}</Badge>
                     </div>
 
                     <h2 className="text-base font-bold text-slate-900">{appt.doctor}</h2>
@@ -138,20 +153,37 @@ export function AppointmentsScreen() {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              {/* Action Button Strip */}
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-slate-400">
                   Virtual dial-in for Arjun enabled
                 </span>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setSelectedApptForPrep(appt)}
-                  className="bg-slate-900 text-xs gap-1.5"
-                >
-                  <ClipboardList className="w-3.5 h-3.5 text-teal-400" />
-                  <span>Before This Appointment</span>
-                </Button>
+                <div className="flex items-center gap-2">
+                  {appt.status === "UPCOMING" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        completeAppointment(appt.id);
+                        setCompletionNotice(`Consultation with ${appt.doctor} completed. Post-visit follow-up task generated.`);
+                        setTimeout(() => setCompletionNotice(null), 6000);
+                      }}
+                      className="text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 gap-1.5"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Complete Consultation</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setSelectedApptForPrep(appt)}
+                    className="bg-slate-900 text-xs gap-1.5"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Before This Appointment</span>
+                  </Button>
+                </div>
               </div>
             </div>
           );
@@ -224,6 +256,46 @@ export function AppointmentsScreen() {
                 </div>
               )}
 
+            {/* Active Medication Regimen Context */}
+            {selectedApptForPrep &&
+              medications.filter(
+                (m) => m.patientId === selectedApptForPrep.patientId && m.status === "ACTIVE"
+              ).length > 0 && (
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/20 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Pill className="w-4 h-4 text-indigo-700" /> Current Medication Regimen Context
+                    </h4>
+                    <span className="text-[10px] font-mono text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded">
+                      Doctor Reference Pack
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {medications
+                      .filter(
+                        (m) => m.patientId === selectedApptForPrep.patientId && m.status === "ACTIVE"
+                      )
+                      .map((m) => (
+                        <div
+                          key={m.id}
+                          className="p-2.5 rounded-lg border border-slate-200 bg-white space-y-0.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900">{m.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500">{m.dosage}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-600">
+                            {m.frequency} • {m.currentStockUnits} tabs left ({m.remainingDays} days)
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Prescribed by: {m.prescribingDoctor}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
             {/* Linked Records Attached to Dossier */}
             <div className="space-y-2">
               <span className="font-bold text-slate-900 text-xs uppercase tracking-wider block">
@@ -256,10 +328,33 @@ export function AppointmentsScreen() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <Button variant="secondary" onClick={() => setSelectedApptForPrep(null)}>
-                Done
-              </Button>
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <span className="text-[11px] text-slate-500">
+                Coordinator: Arjun Rao (Dial-in Active)
+              </span>
+              <div className="flex items-center gap-2">
+                {selectedApptForPrep.status === "UPCOMING" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      completeAppointment(selectedApptForPrep.id);
+                      setSelectedApptForPrep(null);
+                      setCompletionNotice(
+                        `Consultation with ${selectedApptForPrep.doctor} completed. Post-visit follow-up task generated.`
+                      );
+                      setTimeout(() => setCompletionNotice(null), 6000);
+                    }}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Complete &amp; Generate Follow-Up</span>
+                  </Button>
+                )}
+                <Button variant="secondary" size="sm" onClick={() => setSelectedApptForPrep(null)}>
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         )}

@@ -34,6 +34,7 @@ export function CareContinuityScreen() {
     activeUser,
     switchActiveUser,
     activity,
+    resumeCareCoordination,
   } = useCareLoop();
 
   const {
@@ -609,7 +610,22 @@ export function CareContinuityScreen() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {family?.primaryCoordinatorId !== "mem-arjun" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resumeCareCoordination("mem-arjun");
+                      setSuccessMessage("Arjun Rao resumed primary care coordination. Responsibilities restored.");
+                      setTimeout(() => setSuccessMessage(null), 6000);
+                    }}
+                    className="text-xs border-teal-300 text-teal-800 hover:bg-teal-50 gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Resume Arjun as Coordinator</span>
+                  </Button>
+                )}
                 <Button
                   variant={isAvailable ? "outline" : "primary"}
                   size="sm"

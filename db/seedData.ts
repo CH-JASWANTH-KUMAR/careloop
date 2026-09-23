@@ -64,7 +64,7 @@ export const initialFamilyMembers: FamilyMember[] = [
     preferredLanguage: "te-IN",
     emergencyContact: {
       name: "Arjun Rao (Son)",
-      phone: "+91 98801 88990",
+      phone: "+91 93811 88069",
       relation: "Son",
       preferredHospital: "Apollo Hospitals, Jubilee Hills, Hyderabad",
     },
