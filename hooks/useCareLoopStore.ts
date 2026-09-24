@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useSyncExternalStore } from "react";
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   FamilyMember,
   Family,
@@ -25,6 +25,7 @@ import {
 } from "@/db/seedData";
 import { pineLabsPaymentProvider } from "@/services/payment/PaymentProvider";
 import { delhiveryLogisticsProvider } from "@/services/logistics/LogisticsProvider";
+import { deriveCareNotifications } from "@/lib/notifications";
 
 const STORAGE_KEYS = {
   FAMILY: "careloop_family_v2",
@@ -35,7 +36,10 @@ const STORAGE_KEYS = {
   APPOINTMENTS: "careloop_appointments_v2",
   ACTIVITY: "careloop_activity_v2",
   ACTIVE_USER: "careloop_active_user_v2",
+  READ_NOTIFICATIONS: "careloop_read_notifications_v1",
 };
+
+const EMPTY_NOTIFICATION_IDS: string[] = [];
 
 export function useCareLoopStore() {
   const [family, setFamily] = useState<Family>(() => {
@@ -117,6 +121,37 @@ export function useCareLoopStore() {
     }
     return "mem-arjun";
   });
+
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEYS.READ_NOTIFICATIONS);
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return [];
+  });
+
+  const markNotificationAsRead = useCallback((notificationId: string) => {
+    setReadNotificationIds((prev) => {
+      if (prev.includes(notificationId)) return prev;
+      const next = [...prev, notificationId];
+      try {
+        localStorage.setItem(STORAGE_KEYS.READ_NOTIFICATIONS, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback((notificationIds: string[]) => {
+    setReadNotificationIds((prev) => {
+      const next = Array.from(new Set([...prev, ...notificationIds]));
+      try {
+        localStorage.setItem(STORAGE_KEYS.READ_NOTIFICATIONS, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const mounted = useSyncExternalStore(
     () => () => {},
@@ -1176,6 +1211,7 @@ export function useCareLoopStore() {
     setAppointments(initialAppointments);
     setActivity(initialActivityEvents);
     setActiveUserId("mem-arjun");
+    setReadNotificationIds([]);
 
     try {
       localStorage.clear();
@@ -1203,6 +1239,20 @@ export function useCareLoopStore() {
     ? (members.find((m) => m.id === activeUserId) || members[2])
     : initialFamilyMembers[2];
   const stableActiveUserId = mounted ? activeUserId : initialFamilyMembers[2].id;
+  const stableReadNotificationIds = mounted ? readNotificationIds : EMPTY_NOTIFICATION_IDS;
+
+  const notifications = useMemo(() => {
+    return deriveCareNotifications(
+      stableMedications,
+      stableTasks,
+      stableAppointments,
+      stableActivity
+    );
+  }, [stableMedications, stableTasks, stableAppointments, stableActivity]);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter((n) => !stableReadNotificationIds.includes(n.id)).length;
+  }, [notifications, stableReadNotificationIds]);
 
   return {
     mounted,
@@ -1215,6 +1265,11 @@ export function useCareLoopStore() {
     activity:     stableActivity,
     activeUser:   stableActiveUser,
     activeUserId: stableActiveUserId,
+    notifications,
+    unreadCount,
+    readNotificationIds: stableReadNotificationIds,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
     switchActiveUser,
     toggleCoordinatorAvailability,
     takeOverCareCoordination,

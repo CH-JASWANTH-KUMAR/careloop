@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Bell,
   Check,
@@ -14,18 +14,9 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCareLoop } from "@/providers/AppProvider";
+import type { CareNotification } from "@/types";
 
-export interface CareNotification {
-  id: string;
-  category: "MEDICATION" | "APPOINTMENT" | "CARE" | "SAFETY";
-  title: string;
-  description: string;
-  timestamp: string;
-  href: string;
-  isUrgent?: boolean;
-}
-
-const READ_STORAGE_KEY = "careloop_read_notifications_v1";
+export type { CareNotification } from "@/types";
 
 interface NotificationCenterProps {
   isOpen?: boolean;
@@ -39,7 +30,13 @@ export function NotificationCenter({
   onClose: controlledOnClose,
 }: NotificationCenterProps = {}) {
   const router = useRouter();
-  const { medications, tasks, appointments, activity } = useCareLoop();
+  const {
+    notifications,
+    unreadCount,
+    readNotificationIds,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+  } = useCareLoop();
 
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
@@ -52,134 +49,7 @@ export function NotificationCenter({
     }
   }, [controlledOnClose]);
 
-  const [readIds, setReadIds] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem(READ_STORAGE_KEY);
-        if (stored) return JSON.parse(stored);
-      } catch {
-        // safe fallback
-      }
-    }
-    return [];
-  });
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const saveReadIds = (newIds: string[]) => {
-    setReadIds(newIds);
-    try {
-      localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(newIds));
-    } catch {
-      // safe fallback
-    }
-  };
-
-  // Derive notifications from live store data with real healthcare provenance
-  const notifications: CareNotification[] = useMemo(() => {
-    const list: CareNotification[] = [];
-
-    // 1. Safety Alerts & Acute Escalations
-    const escalatedTasks = tasks.filter(
-      (t) => t.status === "ESCALATED" || t.source === "VOICE_ESCALATION"
-    );
-    if (escalatedTasks.length > 0) {
-      escalatedTasks.forEach((t) => {
-        list.push({
-          id: `notif-safety-${t.id}`,
-          category: "SAFETY",
-          title: "Wellness check requires attention",
-          description: t.title || "Anita reported dizziness during morning check-in. Automated workflows paused.",
-          timestamp: "Today",
-          href: "/tasks",
-          isUrgent: true,
-        });
-      });
-    }
-
-    // 2. Medication Notifications
-    const thyronormMed = medications.find((m) => m.id === "med-thyronorm");
-    const hasActiveDelivery = tasks.some(
-      (t) => (t.status === "IN_PROGRESS" || t.status === "WAITING") && t.source === "REFILL_TRIGGER"
-    );
-    if (hasActiveDelivery || (thyronormMed && thyronormMed.remainingDays > 10)) {
-      list.push({
-        id: "notif-med-refill-confirmed",
-        category: "MEDICATION",
-        title: "Thyronorm refill confirmed",
-        description: "Apollo Pharmacy Jubilee Hills dispatch verified. Delhivery tracking live.",
-        timestamp: "2 min ago",
-        href: "/care",
-      });
-    } else {
-      const lowStockMeds = medications.filter(
-        (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
-      );
-      lowStockMeds.forEach((m) => {
-        list.push({
-          id: `notif-med-${m.id}`,
-          category: "MEDICATION",
-          title: `${m.name} supply running low`,
-          description: `Only ${m.remainingDays} days of medication remaining. Refill coordination needed.`,
-          timestamp: "10 min ago",
-          href: "/medications",
-          isUrgent: true,
-        });
-      });
-    }
-
-    // 3. Appointment Notifications
-    const primaryAppt = appointments.find((a) => a.status === "UPCOMING");
-    if (primaryAppt) {
-      list.push({
-        id: `notif-appt-${primaryAppt.id}`,
-        category: "APPOINTMENT",
-        title: `${primaryAppt.doctor} appointment confirmed`,
-        description: `Scheduled for ${primaryAppt.date} at ${primaryAppt.time} (${primaryAppt.hospital}). Pre-visit records assembled.`,
-        timestamp: "1 hr ago",
-        href: "/appointments",
-      });
-    }
-
-    // 4. Care Actions & Completed Check-ins
-    const recentCheckin = activity.find(
-      (ev) =>
-        ev.actionType.includes("VOICE") ||
-        ev.actionType.includes("VERIFIED") ||
-        ev.actor.id === "mem-arjun"
-    );
-    list.push({
-      id: "notif-care-checkin",
-      category: "CARE",
-      title: "Arjun completed your medication check-in",
-      description: recentCheckin?.description || "Morning routine logged and verified with resting vitals.",
-      timestamp: "3 hrs ago",
-      href: "/activity",
-    });
-
-    // 5. Additional Pending Approvals
-    const approvalTasks = tasks.filter(
-      (t) =>
-        t.status === "WAITING_FOR_APPROVAL" ||
-        (t.status === "NEEDS_ATTENTION" && t.requiresApproval)
-    );
-    approvalTasks.forEach((t) => {
-      list.push({
-        id: `notif-approval-${t.id}`,
-        category: "CARE",
-        title: "Care action awaiting sign-off",
-        description: t.title,
-        timestamp: "4 hrs ago",
-        href: "/care",
-        isUrgent: true,
-      });
-    });
-
-    return list;
-  }, [medications, tasks, appointments, activity]);
-
-  const unreadCount = useMemo(() => {
-    return notifications.filter((n) => !readIds.includes(n.id)).length;
-  }, [notifications, readIds]);
 
   // Click outside or Escape to close
   useEffect(() => {
@@ -205,20 +75,16 @@ export function NotificationCenter({
 
   const handleMarkAsRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!readIds.includes(id)) {
-      saveReadIds([...readIds, id]);
-    }
+    markNotificationAsRead(id);
   };
 
   const handleMarkAllAsRead = () => {
     const allIds = notifications.map((n) => n.id);
-    saveReadIds(allIds);
+    markAllNotificationsAsRead(allIds);
   };
 
   const handleNotificationClick = (item: CareNotification) => {
-    if (!readIds.includes(item.id)) {
-      saveReadIds([...readIds, item.id]);
-    }
+    markNotificationAsRead(item.id);
     closeOpen();
     router.push(item.href);
   };
@@ -319,7 +185,7 @@ export function NotificationCenter({
               </div>
             ) : (
               notifications.map((item) => {
-                const isRead = readIds.includes(item.id);
+                const isRead = readNotificationIds.includes(item.id);
                 return (
                   <div
                     key={item.id}

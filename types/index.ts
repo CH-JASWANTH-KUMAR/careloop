@@ -291,3 +291,13 @@ export interface ActivityEvent {
   resultSummary?: string;
   metadata?: Record<string, unknown>;
 }
+
+export interface CareNotification {
+  id: string;
+  category: "MEDICATION" | "APPOINTMENT" | "CARE" | "SAFETY";
+  title: string;
+  description: string;
+  timestamp: string;
+  href: string;
+  isUrgent?: boolean;
+}
