@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useCareLoop } from "@/providers/AppProvider";
-import { FamilyMember } from "@/types";
+import { FamilyMember, Medication, Appointment, Task } from "@/types";
 
 export interface FamilyPulseItem {
   member: FamilyMember;
@@ -19,7 +19,7 @@ export interface CareTimelineEvent {
   patientId: string;
   patientName: string;
   relationship: string;
-  category: "MEDICATION" | "APPOINTMENT" | "DELIVERY" | "CHECKIN" | "TASK";
+  category: "MEDICATION" | "APPOINTMENT" | "DELIVERY" | "CHECKIN" | "TASK" | "VOICE";
   title: string;
   detail: string;
   status: "COMPLETED" | "IN_PROGRESS" | "UPCOMING";
@@ -36,6 +36,32 @@ export interface ContextualShortcut {
   subtext?: string;
 }
 
+export interface PriorityItem {
+  id: string;
+  rank: number;
+  title: string;
+  description: string;
+  patientName: string;
+  patientId: string;
+  category: "MEDICATION" | "APPOINTMENT" | "SYMPTOM" | "TASK" | "DELIVERY";
+  actionLabel: string;
+  actionType: "REFILL" | "APPOINTMENT_VIEW" | "TASK_VIEW" | "VOICE_CHECK" | "CALL_MEMBER" | "RECORDS_VIEW";
+  actionHref?: string;
+  secondaryActionLabel?: string;
+  secondaryActionType?: "VOICE_CHECK" | "CALL_MEMBER" | "LINK";
+  secondaryActionHref?: string;
+  whyRecord: string;
+}
+
+export interface ExplainableRecord {
+  id: string;
+  sourceType: string;
+  recordTitle: string;
+  fact: string;
+  lastVerified: string;
+  patientName: string;
+}
+
 export interface CoordinatorContextType {
   activeUser: FamilyMember;
   isPrimaryCoordinator: boolean;
@@ -44,15 +70,23 @@ export interface CoordinatorContextType {
   roleLabel: string;
   locationLabel: string;
   responsibilitiesText: string;
+  coordinatingCount: number;
   
-  // Dynamic Greetings
+  // Dynamic Greetings & Briefing
   greeting: {
     salutation: string;
     headline: string;
     subtext: string;
     urgencyTone: "urgent" | "calm" | "waiting";
     attentionCount: number;
+    coordinatingSummary: string;
   };
+
+  // Structured Priorities
+  priorityItems: PriorityItem[];
+
+  // Grounded Explainability Records ("Why am I seeing this?")
+  explainableRecords: ExplainableRecord[];
 
   // Filtered & contextual domain slices
   urgentIssues: {
@@ -111,6 +145,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
     const isPrimary = activeUser.id === family?.primaryCoordinatorId;
     const isSecondary = activeUser.role === "MEMBER" && activeUser.id === "mem-meera";
     const isDependent = activeUser.role === "DEPENDENT";
+    const coordinatingCount = members.filter((m) => m.id !== activeUser.id).length;
 
     // 1. Responsibilities Text
     let responsibilitiesText = "";
@@ -126,14 +161,15 @@ export function useCoordinatorContext(): CoordinatorContextType {
       responsibilitiesText = `Family member (${activeUser.relationship}) · Participating in family care coordination.`;
     }
 
-    // 2. Urgent Shortages & Approvals
+    // 2. Urgent Shortages, Escalations & Approvals
     const lowStockMeds = medications.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE");
+    const escalatedTasks = tasks.filter((t) => t.status === "ESCALATED" || t.source === "VOICE_ESCALATION");
     const approvalTasks = tasks.filter(
       (t) => t.status === "WAITING_FOR_APPROVAL" || (t.status === "NEEDS_ATTENTION" && t.requiresApproval)
     );
     const inFlightTasks = tasks.filter((t) => t.status === "IN_PROGRESS" || t.status === "WAITING");
 
-    const totalAttentionCount = lowStockMeds.length + approvalTasks.length;
+    const totalAttentionCount = lowStockMeds.length + approvalTasks.length + escalatedTasks.length;
 
     // 3. Dynamic Greeting & Headline
     const firstName = activeUser.name.split(" ")[0];
@@ -145,23 +181,30 @@ export function useCoordinatorContext(): CoordinatorContextType {
       urgencyTone = "urgent";
     }
 
+    let coordinatingSummary = "";
     if (activeUser.id === "mem-arjun") {
-      if (lowStockMeds.length > 0) {
-        headline = "You're currently coordinating Mum's Thyronorm refill and Dad's upcoming cardiology visit.";
+      coordinatingSummary = `You're coordinating care for ${coordinatingCount} family members today.`;
+      if (escalatedTasks.length > 0) {
+        headline = "Attention needed: Anita reported dizziness during check-in.";
+        subtext = "Automated routines paused. Human check-in and doctor follow-up advised.";
+      } else if (lowStockMeds.length > 0) {
+        headline = "You're coordinating Mum's Thyronorm refill and Dad's upcoming cardiology visit.";
         subtext = `Mum has ${lowStockMeds[0].remainingDays} days of medication remaining. Apollo Pharmacy refill is ready for review.`;
       } else {
-        headline = "The family's care plans are on track today.";
+        headline = "The family's care plans are in good shape today.";
         subtext = "Mum's medication is replenished and Dad's consultation prep is underway.";
       }
     } else if (activeUser.id === "mem-meera") {
+      coordinatingSummary = "Remote caregiving & clinical oversight active from Chennai.";
       if (lowStockMeds.length > 0) {
-        headline = "Here are the family care updates waiting for your review.";
+        headline = "Here are the family care updates waiting for your clinical review.";
         subtext = "Arjun is coordinating Mum's refill. You have backup authorization and clinical oversight rights.";
       } else {
         headline = "All family healthcare tasks are currently up to date.";
         subtext = "Diagnostic records are organized and no pending approvals require attention.";
       }
     } else if (activeUser.id === "mem-anita") {
+      coordinatingSummary = "Personal health schedule and daily routine for Jubilee Hills.";
       if (lowStockMeds.some((m) => m.patientId === "mem-anita")) {
         headline = "Your morning care schedule is active. A refill is being arranged for you.";
         subtext = "Arjun and CareLoop are coordinating your Thyronorm 50mcg delivery via Apollo Pharmacy.";
@@ -170,17 +213,117 @@ export function useCoordinatorContext(): CoordinatorContextType {
         subtext = "You have ample medication supply and your blood pressure logs are steady.";
       }
     } else if (activeUser.id === "mem-ramesh") {
+      coordinatingSummary = "Personal cardiac recovery plan for Jubilee Hills.";
       headline = "Your post-stent cardiac recovery is progressing well.";
       subtext = "You have an upcoming consultation with Dr. K.S. Rao in 5 days. Your pre-visit summary is prepared.";
     } else {
+      coordinatingSummary = "Family care coordination overview.";
       headline = `Here is the current care overview for the Rao family.`;
       subtext = "CareLoop is actively monitoring medications, appointments, and care tasks.";
     }
 
-    // 4. Urgent Issues list
+    // 4. Grounded Priority Items
+    const priorityItems: PriorityItem[] = [];
+    let rankCounter = 1;
+
+    // Case A: Acute symptom report (Highest priority)
+    if (escalatedTasks.length > 0) {
+      priorityItems.push({
+        id: "prio-symptom",
+        rank: rankCounter++,
+        title: "Mum reported dizziness during wellness check",
+        description: "Anita reported lightheadedness upon standing during her morning check-in. Automated refill routine paused.",
+        patientName: "Anita Rao",
+        patientId: "mem-anita",
+        category: "SYMPTOM",
+        actionLabel: "Review Symptom Dossier",
+        actionType: "TASK_VIEW",
+        actionHref: "/tasks",
+        secondaryActionLabel: "Call Anita (+91 98490 12345)",
+        secondaryActionType: "CALL_MEMBER",
+        whyRecord: "Gnani.ai Speech Engine logged acute postural lightheadedness at 08:15 AM today.",
+      });
+    }
+
+    // Case B: Low-stock medication
+    if (lowStockMeds.length > 0) {
+      const med = lowStockMeds[0];
+      const patient = members.find((m) => m.id === med.patientId);
+      const isMum = med.patientId === "mem-anita";
+      const relationLabel = isMum ? "Mum" : patient?.name?.split(" ")[0] || "Family";
+
+      priorityItems.push({
+        id: `prio-med-${med.id}`,
+        rank: rankCounter++,
+        title: `${relationLabel}'s ${med.name.split(" ")[0]} supply is running low`,
+        description: `${med.remainingDays} days remaining (${med.currentStockUnits} tablets). Apollo Pharmacy 60-day refill ready to authorize.`,
+        patientName: patient?.name || "Anita Rao",
+        patientId: med.patientId,
+        category: "MEDICATION",
+        actionLabel: "Refill medication",
+        actionType: "REFILL",
+        secondaryActionLabel: isMum ? "Call Mum" : "Check Schedule",
+        secondaryActionType: "VOICE_CHECK",
+        whyRecord: `${med.name} inventory currently at ${med.currentStockUnits} units (${med.remainingDays} days remaining). Below 5-day safety threshold.`,
+      });
+    }
+
+    // Case C: Upcoming Cardiology appointment
+    const upcomingApts = appointments.filter((a) => a.status === "UPCOMING");
+    if (upcomingApts.length > 0) {
+      const apt = upcomingApts[0];
+      const patient = members.find((m) => m.id === apt.patientId);
+      const isDad = apt.patientId === "mem-ramesh";
+      const relationLabel = isDad ? "Dad" : patient?.name?.split(" ")[0] || "Family";
+
+      priorityItems.push({
+        id: `prio-apt-${apt.id}`,
+        rank: rankCounter++,
+        title: `${relationLabel}'s cardiology appointment is tomorrow`,
+        description: `With ${apt.doctor} (${apt.speciality}) at ${apt.hospital} · ${apt.time || "10:30 AM"}. Pre-consult questions ready.`,
+        patientName: patient?.name || "Ramesh Rao",
+        patientId: apt.patientId,
+        category: "APPOINTMENT",
+        actionLabel: "View appointment",
+        actionType: "APPOINTMENT_VIEW",
+        actionHref: "/appointments",
+        secondaryActionLabel: "Prepare Visit Packet",
+        secondaryActionType: "LINK",
+        secondaryActionHref: "/appointments",
+        whyRecord: `Confirmed cardiology follow-up on ${apt.date} at ${apt.hospital}. Post-PTCA 6-month stent review protocol.`,
+      });
+    }
+
+    // 5. Explainable Records for "Why am I seeing this?"
+    const explainableRecords: ExplainableRecord[] = [
+      {
+        id: "exp-med-1",
+        sourceType: "Pharmacy Inventory Log",
+        recordTitle: "Thyronorm 50 mcg (Anita Rao)",
+        fact: "Stock level: 3 tablets remaining. 7-day deficit requires replenishment before Sep 27.",
+        lastVerified: "Today · 07:30 AM",
+        patientName: "Anita Rao",
+      },
+      {
+        id: "exp-apt-1",
+        sourceType: "Hospital Consultation EHR",
+        recordTitle: "Dr. K.S. Rao — Cardiology Follow-up",
+        fact: "Scheduled for Sep 28 · 10:30 AM at Apollo Hospitals Jubilee Hills. Stent recovery evaluation.",
+        lastVerified: "Yesterday · Verified by Hospital Portal",
+        patientName: "Ramesh Rao",
+      },
+      {
+        id: "exp-safety-1",
+        sourceType: "Clinical Safety Guardrail",
+        recordTitle: "Anti-Diagnostic Protection Protocol",
+        fact: "CareLoop generates coordination recommendations from family medical records and active tasks. CareLoop never diagnoses medical conditions.",
+        lastVerified: "Active Guardrail",
+        patientName: "Family-wide",
+      },
+    ];
+
+    // 6. Urgent Issues list (for backward-compatibility)
     const urgentIssues: CoordinatorContextType["urgentIssues"] = [];
-    
-    // Add low-stock medication issues
     lowStockMeds.forEach((med) => {
       const patient = members.find((m) => m.id === med.patientId);
       const isSelf = med.patientId === activeUser.id;
@@ -200,7 +343,6 @@ export function useCoordinatorContext(): CoordinatorContextType {
       });
     });
 
-    // Add approval tasks
     approvalTasks.forEach((task) => {
       const patient = members.find((m) => m.id === task.familyMemberId);
       urgentIssues.push({
@@ -215,7 +357,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
       });
     });
 
-    // 5. Today's Care Items
+    // 7. Today's Care Items
     const todayCareItems: CoordinatorContextType["todayCareItems"] = [
       {
         id: "today-anita-med",
@@ -255,8 +397,6 @@ export function useCoordinatorContext(): CoordinatorContextType {
       });
     }
 
-    // Add upcoming appointments dynamically to todayCareItems
-    const upcomingApts = appointments.filter((a) => a.status === "UPCOMING");
     upcomingApts.forEach((apt) => {
       const patient = members.find((m) => m.id === apt.patientId);
       const isDad = patient?.relationship === "Father" || apt.patientId === "mem-ramesh";
@@ -276,7 +416,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
       });
     });
 
-    // 6. Family Health Pulse
+    // 8. Family Health Pulse
     const familyPulse: FamilyPulseItem[] = members.map((member) => {
       const isSelf = member.id === activeUser.id;
       const memberMeds = medications.filter((m) => m.patientId === member.id && m.status === "ACTIVE");
@@ -336,7 +476,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
       };
     });
 
-    // 7. Care Timeline
+    // 9. Care Timeline
     const careTimeline: CareTimelineEvent[] = [
       {
         id: "tl-1",
@@ -353,6 +493,19 @@ export function useCoordinatorContext(): CoordinatorContextType {
       },
       {
         id: "tl-2",
+        time: "08:15 AM",
+        patientId: "mem-anita",
+        patientName: "Anita Rao",
+        relationship: "Mother",
+        category: "VOICE",
+        title: "Gnani.ai Voice Medication Check-in",
+        detail: "Automated wellness check verified adherence and logged 3 tabs stock remaining.",
+        status: "COMPLETED",
+        actionHref: "/activity",
+        actionLabel: "View Audio Call",
+      },
+      {
+        id: "tl-3",
         time: "08:45 AM",
         patientId: "mem-ramesh",
         patientName: "Ramesh Rao",
@@ -365,50 +518,55 @@ export function useCoordinatorContext(): CoordinatorContextType {
         actionLabel: "View Log",
       },
       {
-        id: "tl-3",
+        id: "tl-4",
         time: "11:00 AM",
         patientId: "mem-anita",
         patientName: "Anita Rao",
         relationship: "Mother",
         category: "DELIVERY",
-        title: "Pharmacy Refill Order · Apollo Jubilee Hills",
-        detail: "60-tablet pack packaged with cold-chain insulation.",
-        status: inFlightTasks.length > 0 ? "IN_PROGRESS" : "UPCOMING",
+        title: "Apollo Pharmacy Cold-Chain Packaging",
+        detail: "Thyronorm 50 mcg (60-tab bottle) packaged with temperature monitor (4.2°C).",
+        status: "COMPLETED",
         actionHref: "/care",
-        actionLabel: "View Delivery",
-      },
-      {
-        id: "tl-4",
-        time: "03:30 PM",
-        patientId: "mem-anita",
-        patientName: "Anita Rao",
-        relationship: "Mother",
-        category: "CHECKIN",
-        title: "Gnani Native Voice Check-in (Telugu)",
-        detail: "Automated wellness check for medication confirmation.",
-        status: "UPCOMING",
+        actionLabel: "Track Order",
       },
       {
         id: "tl-5",
-        time: "Tomorrow",
+        time: "02:00 PM",
+        patientId: "mem-anita",
+        patientName: "Anita Rao",
+        relationship: "Mother",
+        category: "DELIVERY",
+        title: "Delhivery Courier Out for Delivery",
+        detail: "Courier Suresh K. assigned for doorstep delivery in Jubilee Hills.",
+        status: "IN_PROGRESS",
+        actionHref: "/care",
+        actionLabel: "Track Delhivery",
+      },
+      {
+        id: "tl-6",
+        time: "04:30 PM",
         patientId: "mem-ramesh",
         patientName: "Ramesh Rao",
         relationship: "Father",
         category: "APPOINTMENT",
-        title: "Cardiology Review: Dr. K.S. Rao",
-        detail: "Apollo Jubilee Hills · 10:30 AM · Pre-visit packet ready.",
+        title: "Cardiology Consultation Pre-Visit Dossier",
+        detail: "CareLoop assembled latest stent discharge summary and resting BP trend for Dr. K.S. Rao.",
         status: "UPCOMING",
         actionHref: "/appointments",
         actionLabel: "Open Packet",
       },
     ];
 
-    // 8. AI Care Summary
+    // 10. AI Care Summary
     let aiSummaryText = "";
     if (activeUser.id === "mem-arjun") {
-      if (lowStockMeds.length > 0) {
+      if (escalatedTasks.length > 0) {
         aiSummaryText =
-          "Your family is mostly on track today. Mum's Thyronorm refill is ready for sign-off (3 days remaining), and Dad's post-stent cardiology review is coming up in 5 days with pre-visit vitals collated.";
+          "Attention needed: Anita reported dizziness during her morning check-in. Automated workflows have been paused. Please call Mum and arrange a medical follow-up.";
+      } else if (lowStockMeds.length > 0) {
+        aiSummaryText =
+          "Your family is mostly on track today. Mum's Thyronorm refill is ready for sign-off (3 days remaining), and Dad's post-stent cardiology review is coming up in 5 days with pre-visit vitals collated. Nothing else urgent is pending.";
       } else {
         aiSummaryText =
           "All family healthcare workflows are in good order. Both parents have sufficient medication supply, and doctor consultation dossiers are organized.";
@@ -431,9 +589,8 @@ export function useCoordinatorContext(): CoordinatorContextType {
       lastUpdated: "Just now · Automated Health Check",
     };
 
-    // 9. Contextual Shortcuts per persona
+    // 11. Contextual Shortcuts per persona
     let contextualShortcuts: ContextualShortcut[] = [];
-
     if (activeUser.id === "mem-arjun") {
       contextualShortcuts = [
         {
@@ -456,7 +613,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
         },
         {
           id: "cs-4",
-          label: "Who is handling care while I travel? →",
+          label: "Check care continuity coverage →",
           actionType: "LINK",
           href: "/continuity",
         },
@@ -504,13 +661,13 @@ export function useCoordinatorContext(): CoordinatorContextType {
         },
         {
           id: "cs-a3",
-          label: "Contact Arjun in Bengaluru (+91 93811 88069) →",
+          label: "Call Arjun in Bengaluru (+91 93811 88069) →",
           actionType: "LINK",
           href: "/family",
         },
         {
           id: "cs-a4",
-          label: "Voice check-in (Telugu) →",
+          label: "Start Voice Check-in (Telugu) →",
           actionType: "LINK",
           href: "#voice-check",
         },
@@ -553,13 +710,17 @@ export function useCoordinatorContext(): CoordinatorContextType {
       roleLabel: activeUser.role.replace(/_/g, " "),
       locationLabel: activeUser.location,
       responsibilitiesText,
+      coordinatingCount,
       greeting: {
         salutation: `Good morning, ${firstName}.`,
         headline,
         subtext,
         urgencyTone,
         attentionCount: totalAttentionCount,
+        coordinatingSummary,
       },
+      priorityItems,
+      explainableRecords,
       urgentIssues,
       todayCareItems,
       familyPulse,
@@ -575,4 +736,35 @@ export function useCoordinatorContext(): CoordinatorContextType {
     appointments,
     tasks,
   ]);
+}
+
+// Standalone Helper functions matching prompt requirements
+export function getCoordinatorGreeting(activeUser: FamilyMember, attentionCount: number) {
+  const firstName = activeUser.name.split(" ")[0];
+  return {
+    salutation: `Good morning, ${firstName}.`,
+    attentionText:
+      attentionCount > 0
+        ? `You have ${attentionCount} ${attentionCount === 1 ? "thing that needs" : "things that need"} your attention today.`
+        : "You're all caught up. The family is in good shape today.",
+  };
+}
+
+export function getRelevantTasks(tasks: Task[], activeUser: FamilyMember) {
+  if (activeUser.id === "mem-arjun") {
+    return tasks;
+  }
+  return tasks.filter(
+    (t) => t.familyMemberId === activeUser.id || t.ownerId === activeUser.id
+  );
+}
+
+export function getUpcomingEvents(appointments: Appointment[], medications: Medication[]) {
+  const upcomingApts = appointments.filter((a) => a.status === "UPCOMING");
+  const lowStock = medications.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE");
+  return {
+    appointments: upcomingApts,
+    lowStockMeds: lowStock,
+    totalCount: upcomingApts.length + lowStock.length,
+  };
 }

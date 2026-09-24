@@ -5,44 +5,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ShieldAlert,
-  Phone,
   CheckCircle2,
   AlertTriangle,
   UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { useCareLoop } from "@/providers/AppProvider";
 import { useCoordinatorContext } from "@/hooks/useCoordinatorContext";
 import { VoiceCareButton } from "@/components/voice/VoiceCareButton";
-import { gnaniVoiceProvider } from "@/services/voice/VoiceProvider";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { EmergencyAccessModal } from "@/components/shared/EmergencyAccessModal";
 
 export function Header() {
   const pathname = usePathname();
-  const { members, family, logActivity, addTask } = useCareLoop();
+  const { members, family } = useCareLoop();
   const { greeting, activeUser } = useCoordinatorContext();
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
-  const [isVoiceCalling, setIsVoiceCalling] = useState(false);
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const [voiceCallResult, setVoiceCallResult] = useState<{
-    callId: string;
-    status: string;
-    transcript?: { speaker: string; text: string; timestamp: string }[];
-    extractedOutcome?: {
-      confirmedStock?: boolean;
-      needsRefill?: boolean;
-      reportedSideEffects?: string;
-      escalationTriggered?: boolean;
-      symptomMentioned?: string;
-    };
-  } | null>(null);
 
   // Close any open header modals automatically when route changes
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
     setIsEmergencyOpen(false);
-    setIsVoiceModalOpen(false);
   }
 
   const primaryCoord = members.find((m) => m.id === family?.primaryCoordinatorId);
@@ -64,85 +48,41 @@ export function Header() {
 
   const pageTitle = getPageTitle(pathname);
 
-  const handleSimulateVoiceCheck = async (simulateSymptom = false) => {
-    setIsVoiceCalling(true);
-    try {
-      const res = await gnaniVoiceProvider.initiateCall({
-        targetPhone: "+91 98490 12345",
-        recipientName: "Anita Rao",
-        language: "te-IN",
-        contextPurpose: "MEDICATION_CHECK",
-        patientId: "mem-anita",
-        promptNotes: simulateSymptom
-          ? "Check symptoms and morning condition."
-          : "Check Thyronorm stock and morning dose compliance.",
-        simulateSymptomConcern: simulateSymptom,
-      });
-
-      setVoiceCallResult({
-        callId: res.callId,
-        status: res.status,
-        transcript: res.transcript,
-        extractedOutcome: res.extractedOutcome,
-      });
-      setIsVoiceModalOpen(true);
-
-      if (simulateSymptom && res.extractedOutcome?.escalationTriggered) {
-        addTask({
-          title: "URGENT: Review Acute Symptom Report (Anita Rao)",
-          description:
-            "Gnani Voice Check detected reported dizziness and lightheadedness. CareLoop blocked automated operations and escalated to human caregivers for clinical evaluation.",
-          familyMemberId: "mem-anita",
-          ownerId: family?.primaryCoordinatorId || "mem-arjun",
-          priority: "URGENT",
-          dueDate: "Today",
-          status: "ESCALATED",
-          source: "VOICE_ESCALATION",
-          requiresApproval: true,
-        });
-
-        logActivity({
-          actor: { id: "rail-gnani", name: "Gnani.ai Voice Rail", type: "PROVIDER_GNANI" },
-          actionType: "VOICE_ESCALATION_TRIGGERED",
-          entityType: "TASK",
-          entityId: res.callId,
-          description:
-            "Voice check detected acute symptom concern (dizziness) reported by Anita Rao. CareLoop stopped automated workflows and escalated to family.",
-          whyExplanation:
-            "Clinical Safety Boundary Rule: AI agents must never diagnose or interpret symptoms. Any reported acute concern triggers immediate human caregiver escalation.",
-        });
-      }
-    } finally {
-      setIsVoiceCalling(false);
-    }
-  };
-
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 lg:px-8 py-3 flex items-center justify-between">
-      {/* Left: Page Context & Family Context */}
+    <header className="h-16 px-4 md:px-6 bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 flex items-center justify-between transition-all">
+      {/* Left: Dynamic Breadcrumb & Contextual Personalization */}
       <div className="flex items-center gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-900 font-display">{pageTitle}</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-xs font-semibold text-slate-600">Your family ({family?.name || "The Rao Family"})</span>
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span>The Rao Family</span>
+            <span className="text-slate-300">/</span>
+            <span className="text-slate-800 font-semibold">{pageTitle}</span>
           </div>
-          <p className="text-[11px] text-slate-500 hidden sm:block">
-            Viewing as <span className="font-semibold text-slate-700">{activeUser.name}</span> ({activeUser.relationship}) · {family?.primaryCity || "Hyderabad & Bengaluru"}
-          </p>
+
+          <div className="flex items-center gap-2 mt-0.5">
+            <h1 className="text-base font-bold text-slate-900 leading-tight">
+              {pageTitle === "Home" ? `Care Overview · ${activeUser.name.split(" ")[0]}` : pageTitle}
+            </h1>
+            <span className="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/70">
+              Viewing as {activeUser.name} ({activeUser.relationship})
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Right: Actions (Attention Badge, Coordinator Status, Voice Check, Emergency Access) */}
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        {/* Dynamic Contextual Attention Pill */}
+      {/* Right: Actions (Attention Badge, Continuity Status, Notifications, Voice Check, Emergency Access) */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Dynamic Attention Status Badge */}
         {greeting.attentionCount > 0 ? (
           <Link
             href="/care"
             className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
-            <span>{greeting.attentionCount} {greeting.attentionCount === 1 ? "thing needs attention" : "things need attention"}</span>
+            <span>
+              {greeting.attentionCount}{" "}
+              {greeting.attentionCount === 1 ? "thing needs attention" : "things need attention"}
+            </span>
           </Link>
         ) : (
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
@@ -154,7 +94,7 @@ export function Header() {
         {/* Care Coordinator Availability Status */}
         <Link
           href="/continuity"
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+          className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all ${
             isAvailable
               ? "bg-emerald-50/70 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
               : "bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200"
@@ -164,17 +104,18 @@ export function Header() {
           {isAvailable ? (
             <>
               <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden md:inline">{primaryCoord?.name?.split(" ")[0] || "Coordinator"}: Available</span>
-              <span className="md:hidden">Available</span>
+              <span>{primaryCoord?.name?.split(" ")[0] || "Coordinator"}: Available</span>
             </>
           ) : (
             <>
               <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-              <span className="hidden md:inline">{primaryCoord?.name?.split(" ")[0] || "Coordinator"}: Unavailable</span>
-              <span className="md:hidden font-bold">Handover Needed</span>
+              <span className="font-bold">Handover Needed</span>
             </>
           )}
         </Link>
+
+        {/* Notification Center */}
+        <NotificationCenter />
 
         {/* Voice Coordination Check Trigger */}
         <VoiceCareButton variant="header" />
@@ -191,162 +132,12 @@ export function Header() {
         </Button>
       </div>
 
-      {/* Emergency Modal */}
-      <Modal
+      {/* Emergency Dossier Modal */}
+      <EmergencyAccessModal
         isOpen={isEmergencyOpen}
         onClose={() => setIsEmergencyOpen(false)}
-        title="Emergency Medical Dossier"
-        description="Immediate contacts, preferred hospitals, and critical blood group/allergy data for first responders."
-        maxWidth="lg"
-      >
-        <div className="space-y-4">
-          {members
-            .filter((m) => m.role === "DEPENDENT")
-            .map((member) => (
-              <div
-                key={member.id}
-                className="p-4 rounded-xl border border-red-200 bg-red-50/30 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {member.name} ({member.relationship}, Age {member.age})
-                    </h3>
-                    <p className="text-xs text-slate-600">{member.location}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs font-bold font-mono">
-                      Blood: {member.bloodGroup}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white p-3 rounded-lg border border-red-100">
-                  <div>
-                    <span className="text-[11px] text-slate-400 font-semibold uppercase block">
-                      Preferred Hospital
-                    </span>
-                    <span className="font-medium text-slate-800">
-                      {member.emergencyContact.preferredHospital}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 font-semibold uppercase block">
-                      Emergency Attendant
-                    </span>
-                    <span className="font-medium text-slate-800 flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-emerald-600" />
-                      {member.emergencyContact.name} ({member.emergencyContact.phone})
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 font-semibold uppercase block">
-                      Documented Allergies
-                    </span>
-                    <span className="font-semibold text-red-600">
-                      {member.allergies.join(", ") || "None documented"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 font-semibold uppercase block">
-                      Insurance Policy
-                    </span>
-                    <span className="font-mono text-slate-700">{member.insuranceId || "On file"}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-        </div>
-      </Modal>
-
-      {/* Voice Call Simulation Modal - ONLY open when isVoiceModalOpen is explicitly true */}
-      <Modal
-        isOpen={isVoiceModalOpen && !!voiceCallResult}
-        onClose={() => setIsVoiceModalOpen(false)}
-        title="Gnani Voice Coordination Session"
-        description="Outbound conversational AI call in Telugu/English with Anita Rao."
-        maxWidth="lg"
-      >
-        {voiceCallResult && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between p-3 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 gap-2">
-              <div className="flex items-center gap-2">
-                {voiceCallResult.status === "ESCALATED_TO_HUMAN" ? (
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 text-sky-600" />
-                )}
-                <span className="font-semibold">
-                  Status: {voiceCallResult.status.replace(/_/g, " ")}
-                </span>
-              </div>
-              <span className="font-mono text-[11px] text-sky-700">
-                Call ID: {voiceCallResult.callId}
-              </span>
-            </div>
-
-            {/* Potential Health Concern Alert Banner */}
-            {voiceCallResult.extractedOutcome?.escalationTriggered && (
-              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-950 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-sm text-red-900">
-                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                  Safety Escalate: Symptom Detected
-                </div>
-                <p className="text-xs text-red-800 leading-relaxed font-semibold">
-                  &ldquo;Potential health concern mentioned. No medical conclusion was made. Human attention required.&rdquo;
-                </p>
-                <div className="text-[11px] text-red-700">
-                  Reported: <strong>{voiceCallResult.extractedOutcome.symptomMentioned}</strong>. CareLoop has halted automated refill routines and dispatched an urgent escalation task to {primaryCoord?.name || "the family coordinator"}.
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-60 overflow-y-auto">
-              {voiceCallResult.transcript?.map((t, idx) => (
-                <div
-                  key={idx}
-                  className={`p-2.5 rounded-lg text-xs leading-relaxed ${
-                    t.speaker === "AGENT"
-                      ? "bg-white border border-slate-200 text-slate-800 mr-4"
-                      : "bg-teal-50 border border-teal-200 text-teal-900 ml-4 font-medium"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                    <span className="font-semibold uppercase tracking-wider">
-                      {t.speaker === "AGENT" ? "CareLoop Voice Agent" : "Anita Rao (Mother)"}
-                    </span>
-                    <span className="font-mono">{t.timestamp}</span>
-                  </div>
-                  <p>{t.text}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Test alternative button */}
-            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSimulateVoiceCheck(!voiceCallResult.extractedOutcome?.escalationTriggered)}
-                isLoading={isVoiceCalling}
-                className="text-xs text-slate-600"
-              >
-                {voiceCallResult.extractedOutcome?.escalationTriggered
-                  ? "Test Routine Stock Check"
-                  : "Test Symptom Concern Escalation"}
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => setIsVoiceModalOpen(false)}
-                className="text-xs bg-slate-900 text-white"
-              >
-                Close Session
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        defaultMemberId={activeUser.id}
+      />
     </header>
   );
 }

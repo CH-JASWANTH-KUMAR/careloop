@@ -2,48 +2,27 @@
 
 import React, { useState } from "react";
 import {
-  Pill,
-  ShieldCheck,
   CreditCard,
-  Truck,
   CheckCircle2,
   Info,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
-import { Medication } from "@/types";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { Tabs } from "@/components/ui/Tabs";
+import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
+import { FamilyAvatar } from "@/components/ui/FamilyAvatar";
 
 export function MedicationsScreen() {
-  const { medications, members, activeUser, refillMedication } = useCareLoop();
+  const { medications, members } = useCareLoop();
   const [filterPatient, setFilterPatient] = useState<string>("ALL");
-  const [selectedMedForRefill, setSelectedMedForRefill] = useState<Medication | null>(null);
-  const [isProcessingRefill, setIsProcessingRefill] = useState(false);
-  const [refillSuccessMsg, setRefillSuccessMsg] = useState<string | null>(null);
+  const [selectedMedIdForRefill, setSelectedMedIdForRefill] = useState<string | null>(null);
 
   const filteredMeds = medications.filter((m) => {
     if (filterPatient !== "ALL" && m.patientId !== filterPatient) return false;
     return true;
   });
-
-  const handleRefillConfirm = async () => {
-    if (!selectedMedForRefill) return;
-    setIsProcessingRefill(true);
-    try {
-      const result = await refillMedication(selectedMedForRefill.id);
-      if (result) {
-        setRefillSuccessMsg(
-          `Refill authorized for ${selectedMedForRefill.name}. Charged ₹${result.auth.amount} via Pine Labs. Dispatched via Delhivery (AWB: ${result.shipment.awbNumber}).`
-        );
-        setTimeout(() => setRefillSuccessMsg(null), 6000);
-      }
-    } finally {
-      setIsProcessingRefill(false);
-      setSelectedMedForRefill(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -86,22 +65,6 @@ export function MedicationsScreen() {
         </div>
       </div>
 
-      {/* Success Notification */}
-      {refillSuccessMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-900">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-medium">{refillSuccessMsg}</span>
-          </div>
-          <button
-            onClick={() => setRefillSuccessMsg(null)}
-            className="text-emerald-700 hover:text-emerald-900 font-semibold"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
       {/* Medication Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {filteredMeds.map((med) => {
@@ -112,110 +75,152 @@ export function MedicationsScreen() {
             Math.max(5, (med.remainingDays / med.refillIntervalDays) * 100)
           );
 
+          // Derived last confirmed time & schedule detail
+          const lastConfirmedText = isLowStock
+            ? "Today · 07:30 AM (Confirmed by Voice Check)"
+            : "Today · 08:30 AM (Taken after breakfast)";
+
+          const deliveryStatus = isLowStock
+            ? "Fulfillment required · Apollo Pharmacy Jubilee Hills"
+            : "Stock ample · Next scheduled dispatch in 25 days";
+
           return (
             <div
               key={med.id}
-              className={`p-5 rounded-xl subtle-card flex flex-col justify-between transition-all space-y-4 ${
-                isLowStock ? "border-l-4 border-l-red-500" : ""
+              className={`p-5 rounded-2xl bg-white border transition-all space-y-4 shadow-2xs ${
+                isLowStock
+                  ? "border-rose-300 ring-1 ring-rose-500/20"
+                  : "border-slate-200/90"
               }`}
             >
               <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-slate-500">
-                        {patient?.name} ({patient?.relationship})
+                {/* Header Row: Member + Refill Status Badge */}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2.5">
+                    {patient && <FamilyAvatar member={patient} size="sm" />}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">
+                          {patient?.name}
+                        </span>
+                        <span className="text-slate-400 text-xs">({patient?.relationship})</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        Prescribed by Dr. {med.prescribingDoctor}
                       </span>
-                      <span>•</span>
-                      <Badge variant={isLowStock ? "urgent" : "success"} showDot={isLowStock}>
-                        {isLowStock
-                          ? `Refill in ${med.remainingDays} days`
-                          : `${med.remainingDays} days left`}
-                      </Badge>
                     </div>
-
-                    <h2 className="text-base font-bold text-slate-900">{med.name}</h2>
-                    <p className="text-xs font-mono font-medium text-slate-600 mt-0.5">
-                      Dosage: {med.dosage}
-                    </p>
                   </div>
 
-                  <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      isLowStock ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
-                    }`}
-                  >
-                    <Pill className="w-5 h-5" />
+                  <div className="shrink-0">
+                    {isLowStock ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold animate-pulse">
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                        <span>REFILL REQUIRED</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Medication on track</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Stock & Refill Details Grid */}
-                <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-2.5 mt-3 border border-slate-100">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 font-medium">Daily Regimen:</span>
-                    <span className="font-semibold text-slate-800">{med.frequency}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-[11px]">
-                    <div>
-                      <span className="text-slate-400 block uppercase text-[10px]">Remaining Quantity</span>
-                      <span className="font-mono font-bold text-slate-900">{med.currentStockUnits} tablets</span>
-                      <span className="text-amber-700 block text-[10px] font-semibold">({med.remainingDays} days remaining)</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block uppercase text-[10px]">Refill Threshold</span>
-                      <span className="font-mono text-slate-700">&le; 5 days remaining</span>
-                      <span className="text-slate-500 block text-[10px]">Next: {med.nextRefillDate || "Imminent"}</span>
-                    </div>
-                  </div>
-                  <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500">Prescription Status:</span>
-                    <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      Verified on File (Dr. {med.prescribingDoctor})
+                {/* Medication Name & Dosage */}
+                <div className="pt-1">
+                  <h2 className="text-lg font-bold text-slate-900 uppercase tracking-tight">
+                    {med.name} {med.dosage}
+                  </h2>
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">
+                    {med.instructions || `${med.frequency} · Take with plain water.`}
+                  </p>
+                </div>
+
+                {/* Detailed Spec Grid (Prompt Requirement 7) */}
+                <div className="p-3.5 bg-slate-50 rounded-xl text-xs space-y-2 mt-3.5 border border-slate-200/70">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Dosage & Schedule:</span>
+                    <span className="font-semibold text-slate-800">
+                      {med.dosage} · {med.frequency}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Responsible Person:</span>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Remaining Supply:</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        isLowStock ? "text-rose-700" : "text-slate-900"
+                      }`}
+                    >
+                      {med.remainingDays} days remaining ({med.currentStockUnits} units)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                    <span className="text-slate-500 font-medium">Last Confirmed:</span>
+                    <span className="font-medium text-slate-700 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      {lastConfirmedText}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Fulfillment Pharmacy:</span>
                     <span className="font-semibold text-slate-800">
-                      {activeUser.name} ({activeUser.role.replace(/_/g, " ")})
+                      {med.pharmacyName}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                    <span className="text-slate-500 font-medium">Delivery Status:</span>
+                    <span
+                      className={`font-medium ${
+                        isLowStock ? "text-amber-800 font-semibold" : "text-slate-600"
+                      }`}
+                    >
+                      {deliveryStatus}
                     </span>
                   </div>
                 </div>
 
                 {/* Stock Gauge */}
-                <div className="space-y-1 mt-2">
+                <div className="space-y-1 mt-3">
+                  <div className="flex justify-between text-[11px] text-slate-500 font-mono">
+                    <span>Stock Level</span>
+                    <span>{percentage.toFixed(0)}%</span>
+                  </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 rounded-full ${
-                        isLowStock ? "bg-red-500" : "bg-emerald-500"
+                        isLowStock ? "bg-rose-500" : "bg-emerald-500"
                       }`}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
                 </div>
-
-                {/* Fulfillment Store */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Pharmacy: <strong className="text-slate-700">{med.pharmacyName}</strong></span>
-                  <span className="text-slate-400 italic text-[10px]">Dosage changes prohibited</span>
-                </div>
               </div>
 
-              {/* Refill Button */}
+              {/* Action Bar */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-800">
-                  Est. ₹{med.costEstimate} (60-day supply)
-                </span>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-mono">Est. 60-day pack</span>
+                  <span className="font-bold text-slate-900 font-mono text-sm">
+                    ₹{med.costEstimate}
+                  </span>
+                </div>
+
                 <Button
                   variant={isLowStock ? "primary" : "outline"}
                   size="sm"
-                  onClick={() => setSelectedMedForRefill(med)}
-                  className={`text-xs gap-1.5 ${
-                    isLowStock ? "bg-slate-900 text-white" : "border-slate-300"
+                  onClick={() => setSelectedMedIdForRefill(med.id)}
+                  className={`text-xs gap-1.5 cursor-pointer ${
+                    isLowStock
+                      ? "bg-slate-900 hover:bg-slate-800 text-white font-bold"
+                      : "border-slate-300 text-slate-700"
                   }`}
                 >
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Coordinate Refill</span>
+                  <span>{isLowStock ? "Refill Medication" : "Coordinate Refill"}</span>
                 </Button>
               </div>
             </div>
@@ -223,88 +228,14 @@ export function MedicationsScreen() {
         })}
       </div>
 
-      {/* Pine Labs Refill Authorization Modal */}
-      <Modal
-        isOpen={!!selectedMedForRefill}
-        onClose={() => setSelectedMedForRefill(null)}
-        title="Authorize Medication Refill"
-        description="Pine Labs payment verification & Delhivery courier scheduling."
-        maxWidth="md"
-      >
-        {selectedMedForRefill && (
-          <div className="space-y-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-              <div className="flex justify-between font-semibold">
-                <span className="text-slate-500">Medication:</span>
-                <span className="text-slate-900">{selectedMedForRefill.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Dosage & Frequency:</span>
-                <span className="text-slate-800 font-mono">
-                  {selectedMedForRefill.dosage} ({selectedMedForRefill.frequency})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Fulfillment Store:</span>
-                <span className="text-slate-800">{selectedMedForRefill.pharmacyName}</span>
-              </div>
-              <div className="flex justify-between font-bold pt-1 border-t border-slate-200">
-                <span className="text-slate-700">Estimated Cost:</span>
-                <span className="text-slate-900 font-mono text-sm">
-                  ₹{selectedMedForRefill.costEstimate}
-                </span>
-              </div>
-            </div>
-
-            {/* Pine Labs Authorization Card */}
-            <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-bold text-amber-950">
-                  <CreditCard className="w-4 h-4 text-amber-700" /> Pine Labs Authorization
-                </span>
-                <span className="text-[10px] font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">
-                  OTP / Biometric Protected
-                </span>
-              </div>
-              <p className="text-slate-600 leading-relaxed">
-                Charge of <strong>₹{selectedMedForRefill.costEstimate}</strong> will be authorized against The Rao Family healthcare account. Monthly spending threshold limit: ₹1,500.
-              </p>
-              <div className="text-[11px] text-slate-500">
-                Authorized signatory: <strong className="text-slate-800">{activeUser.name}</strong>
-              </div>
-            </div>
-
-            {/* Delhivery Courier Notice */}
-            <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-900 flex items-start gap-2">
-              <Truck className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold block">Delhivery Cold Chain Dispatch:</span>
-                <p className="text-[11px] text-sky-800 mt-0.5">
-                  Package will be picked up from Apollo Begumpet Hub and delivered within 24 hours to Jubilee Hills, Hyderabad.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedMedForRefill(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                isLoading={isProcessingRefill}
-                onClick={handleRefillConfirm}
-                className="bg-slate-900 text-white gap-1.5"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Authorize & Dispatch</span>
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* 7-Step End-to-End Refill Workflow Modal */}
+      {selectedMedIdForRefill && (
+        <RefillWorkflowModal
+          isOpen={!!selectedMedIdForRefill}
+          onClose={() => setSelectedMedIdForRefill(null)}
+          medicationId={selectedMedIdForRefill}
+        />
+      )}
     </div>
   );
 }
