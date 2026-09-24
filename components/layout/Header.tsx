@@ -15,19 +15,19 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { EmergencyAccessModal } from "@/components/shared/EmergencyAccessModal";
 import { CareLoopAssistantModal } from "@/components/assistant/CareLoopAssistantModal";
 
+export type ActiveHeaderDialog = null | "emergency" | "assistant" | "notifications";
+
 export function Header() {
   const pathname = usePathname();
   const { members, family, tasks } = useCareLoop();
   const { greeting, activeUser } = useCoordinatorContext();
-  const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<ActiveHeaderDialog>(null);
 
   // Close any open header modals automatically when route changes
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
-    setIsEmergencyOpen(false);
-    setIsAssistantOpen(false);
+    setActiveDialog(null);
   }
 
   const primaryCoord = members.find((m) => m.id === family?.primaryCoordinatorId);
@@ -141,14 +141,24 @@ export function Header() {
         </Link>
 
         {/* 3. Notifications with Attached Unread Badge */}
-        <NotificationCenter />
+        <NotificationCenter
+          isOpen={activeDialog === "notifications"}
+          onToggle={() =>
+            setActiveDialog((prev) => (prev === "notifications" ? null : "notifications"))
+          }
+          onClose={() => setActiveDialog(null)}
+        />
 
         {/* 4. Talk to CareLoop Assistant Modal Trigger */}
         <button
           type="button"
-          onClick={() => setIsAssistantOpen(true)}
+          onClick={() =>
+            setActiveDialog((prev) => (prev === "assistant" ? null : "assistant"))
+          }
           className="h-9 px-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/20"
           title="Open CareLoop Family Coordination Assistant"
+          aria-expanded={activeDialog === "assistant"}
+          aria-haspopup="dialog"
         >
           <Bot className="w-4 h-4 text-teal-200 shrink-0" />
           <span className="hidden sm:inline">Talk to CareLoop</span>
@@ -158,9 +168,13 @@ export function Header() {
         {/* 5. Emergency Access Action */}
         <button
           type="button"
-          onClick={() => setIsEmergencyOpen(true)}
+          onClick={() =>
+            setActiveDialog((prev) => (prev === "emergency" ? null : "emergency"))
+          }
           className="h-9 px-3 rounded-xl border border-rose-200 bg-rose-50/90 text-rose-700 hover:bg-rose-100 hover:border-rose-300 font-semibold text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20"
           title="Open Clinical Emergency Dossier & Contacts"
+          aria-expanded={activeDialog === "emergency"}
+          aria-haspopup="dialog"
         >
           <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
           <span className="hidden sm:inline">Emergency Access</span>
@@ -170,14 +184,14 @@ export function Header() {
 
       {/* CareLoop Family Coordination Assistant Modal */}
       <CareLoopAssistantModal
-        isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
+        isOpen={activeDialog === "assistant"}
+        onClose={() => setActiveDialog(null)}
       />
 
       {/* Emergency Dossier & Escalation Modal */}
       <EmergencyAccessModal
-        isOpen={isEmergencyOpen}
-        onClose={() => setIsEmergencyOpen(false)}
+        isOpen={activeDialog === "emergency"}
+        onClose={() => setActiveDialog(null)}
         defaultMemberId={activeUser.id}
       />
     </header>

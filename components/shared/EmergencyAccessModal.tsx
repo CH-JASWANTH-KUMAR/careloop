@@ -9,6 +9,10 @@ import {
   Heart,
   Check,
   Copy,
+  UserCheck,
+  FileText,
+  AlertTriangle,
+  Ambulance,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -26,12 +30,15 @@ export function EmergencyAccessModal({
   onClose,
   defaultMemberId = "mem-anita",
 }: EmergencyAccessModalProps) {
-  const { members, medications, records, activeUser, logActivity } = useCareLoop();
+  const { members, medications, records, activeUser, family, logActivity } = useCareLoop();
   const [selectedMemberId, setSelectedMemberId] = useState(defaultMemberId);
   const [copied, setCopied] = useState(false);
 
   const selectedMember =
     members.find((m) => m.id === selectedMemberId) || members[0];
+
+  const primaryCoord = members.find((m) => m.id === family?.primaryCoordinatorId);
+  const isCoordAvailable = family?.isCoordinatorAvailable ?? true;
 
   const memberMedications = medications.filter(
     (m) => m.patientId === selectedMember?.id && m.status === "ACTIVE"
@@ -64,198 +71,273 @@ export function EmergencyAccessModal({
 
   if (!selectedMember) return null;
 
+  const modalFooter = (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href={`tel:${selectedMember.emergencyContact.phone}`}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+        >
+          <Phone className="w-3.5 h-3.5" /> Call Primary Attendant
+        </a>
+
+        <button
+          type="button"
+          onClick={handleShareProfile}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs border border-slate-200 transition-colors cursor-pointer"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied Dossier
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5 text-slate-600" /> View Emergency Dossier
+            </>
+          )}
+        </button>
+      </div>
+
+      <Button variant="outline" size="sm" onClick={onClose} className="text-xs font-semibold">
+        Close
+      </Button>
+    </>
+  );
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Emergency Medical Dossier"
-      description="Read-only emergency clinical profile formatted for first responders, triage nurses, and family coordinators."
-      maxWidth="lg"
+      title="Emergency Access"
+      description="Access critical family health information when normal coordination isn't available."
+      headerBadge={
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-200 uppercase tracking-wide">
+          TEMPORARY ACCESS · READ-ONLY
+        </span>
+      }
+      footer={modalFooter}
+      maxWidth="xl"
     >
       <div className="space-y-4">
-        {/* Family Member Selector Tabs */}
-        <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-xl overflow-x-auto">
-          {members.map((member) => {
-            const isSelected = member.id === selectedMemberId;
-            return (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => setSelectedMemberId(member.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${
-                  isSelected
-                    ? "bg-white text-slate-900 shadow-xs font-semibold"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <FamilyAvatar member={member} size="xs" />
-                <span>{member.name.split(" ")[0]}</span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {member.bloodGroup}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* SECTION 1: Current Family Member Selector & Summary */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span>1. Current Family Member</span>
+            <span className="font-mono text-slate-400">Select to view triage profile</span>
+          </div>
 
-        {/* Patient Hero Dossier Card */}
-        <div className="p-4 rounded-2xl bg-rose-50/40 border border-rose-200/80 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-xl overflow-x-auto">
+            {members.map((member) => {
+              const isSelected = member.id === selectedMemberId;
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => setSelectedMemberId(member.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 cursor-pointer ${
+                    isSelected
+                      ? "bg-white text-slate-900 shadow-xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <FamilyAvatar member={member} size="xs" />
+                  <span>{member.name.split(" ")[0]}</span>
+                  <span className="text-[10px] text-slate-400 font-mono font-bold">
+                    {member.bloodGroup}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <FamilyAvatar member={selectedMember} size="lg" />
+              <FamilyAvatar member={selectedMember} size="md" />
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
                   {selectedMember.name}
-                  <span className="text-xs font-normal text-slate-500">
+                  <span className="text-xs font-normal text-slate-500 ml-1.5">
                     ({selectedMember.relationship}, {selectedMember.age} yrs)
                   </span>
                 </h3>
-                <p className="text-xs text-slate-600">{selectedMember.location}</p>
+                <p className="text-xs text-slate-500">{selectedMember.location}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="px-3 py-1 rounded-xl bg-rose-600 text-white font-mono font-bold text-xs shadow-xs">
-                Blood: {selectedMember.bloodGroup}
-              </div>
+            <div className="shrink-0 px-3 py-1 rounded-xl bg-rose-600 text-white font-mono font-bold text-xs shadow-xs">
+              Blood: {selectedMember.bloodGroup}
             </div>
           </div>
+        </div>
 
-          {/* Quick Contact & Hospital Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white p-3.5 rounded-xl border border-rose-100 shadow-2xs">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Preferred Emergency Hospital
+        {/* SECTION 2: Emergency Contacts & Dispatch Numbers */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            2. Emergency Contacts &amp; First Responders
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Primary Family Attendant
               </span>
-              <p className="font-semibold text-slate-800 flex items-center gap-1.5">
-                <Hospital className="w-3.5 h-3.5 text-rose-600" />
-                {selectedMember.emergencyContact.preferredHospital}
+              <p className="font-semibold text-slate-900">
+                {selectedMember.emergencyContact.name} ({selectedMember.emergencyContact.relation})
               </p>
-              {selectedMember.primaryPhysician && (
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Attending: {selectedMember.primaryPhysician}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Primary Emergency Contact
-              </span>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-slate-800">
-                    {selectedMember.emergencyContact.name} (
-                    {selectedMember.emergencyContact.relation})
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {selectedMember.emergencyContact.phone}
-                  </p>
-                </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="font-mono text-slate-600">
+                  {selectedMember.emergencyContact.phone}
+                </span>
                 <a
                   href={`tel:${selectedMember.emergencyContact.phone}`}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex items-center gap-1 shadow-xs transition-colors"
+                  className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[11px] hover:bg-emerald-100 transition-colors flex items-center gap-1"
                 >
-                  <Phone className="w-3 h-3" /> Call
+                  <Phone className="w-3 h-3 text-emerald-600" /> Dial
+                </a>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Preferred Emergency Hospital
+              </span>
+              <p className="font-semibold text-slate-900 flex items-center gap-1.5 truncate">
+                <Hospital className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                <span className="truncate">{selectedMember.emergencyContact.preferredHospital}</span>
+              </p>
+              <div className="flex items-center justify-between pt-1 text-[11px]">
+                <span className="text-slate-500">Ambulance Emergency</span>
+                <a
+                  href="tel:108"
+                  className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-semibold hover:bg-rose-100 transition-colors flex items-center gap-1"
+                >
+                  <Ambulance className="w-3 h-3 text-rose-600" /> 108
                 </a>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Clinical Profile: Allergies, Conditions & Meds */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3 text-amber-600" /> Allergies & Warnings
-              </span>
-              <p className="font-semibold text-rose-700">
-                {selectedMember.allergies.length > 0
-                  ? selectedMember.allergies.join(", ")
-                  : "No known adverse drug allergies"}
-              </p>
-
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-2.5 mb-1 flex items-center gap-1">
-                <Heart className="w-3 h-3 text-rose-500" /> Chronic Conditions
-              </span>
-              <p className="text-slate-700">
-                {selectedMember.conditions.join(", ") || "None documented"}
-              </p>
+        {/* SECTION 3: Allergies & Clinical Warnings */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <span>3. Allergies &amp; Critical Warnings</span>
+          </div>
+          <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-slate-900">Drug Allergies: </span>
+                <span className="font-semibold text-rose-800">
+                  {selectedMember.allergies.length > 0
+                    ? selectedMember.allergies.join(", ")
+                    : "No known adverse drug allergies documented"}
+                </span>
+              </div>
             </div>
+            <div className="flex items-start gap-2 pl-6 text-[11px] text-slate-700">
+              <span className="font-semibold text-slate-900">Chronic Conditions: </span>
+              <span>{selectedMember.conditions.join(", ") || "None documented"}</span>
+            </div>
+          </div>
+        </div>
 
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                <Pill className="w-3 h-3 text-teal-600" /> Active Medications
-              </span>
-              {memberMedications.length > 0 ? (
-                <ul className="space-y-1 text-slate-800">
-                  {memberMedications.map((m) => (
-                    <li key={m.id} className="flex items-center justify-between text-xs">
-                      <span className="font-medium">{m.name}</span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {m.dosage} · {m.frequency}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-slate-500 text-xs italic">No active medications logged</p>
-              )}
+        {/* SECTION 4: Active Medications */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <Pill className="w-3.5 h-3.5 text-teal-600" />
+            <span>4. Active Medications</span>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs">
+            {memberMedications.length > 0 ? (
+              <ul className="divide-y divide-slate-100 space-y-1">
+                {memberMedications.map((m) => (
+                  <li key={m.id} className="pt-1 first:pt-0 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-slate-900">{m.name}</span>
+                      <span className="text-slate-500 ml-1.5 text-[11px]">{m.dosage}</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                      {m.frequency} · {m.instructions}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-slate-500 text-xs italic">No active medications registered.</p>
+            )}
+          </div>
+        </div>
 
-              {memberRecords.length > 0 && (
-                <div className="mt-2.5 pt-2 border-t border-slate-100">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                    Latest Clinical Record
-                  </span>
-                  <p className="text-[11px] text-slate-700 truncate">
-                    {memberRecords[0].title} ({memberRecords[0].date})
-                  </p>
+        {/* SECTION 5: Recent Critical Health Information */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <Heart className="w-3.5 h-3.5 text-rose-500" />
+            <span>5. Recent Critical Health Information</span>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs space-y-1">
+            {memberRecords.length > 0 ? (
+              memberRecords.map((r) => (
+                <div key={r.id} className="flex items-center justify-between text-xs py-0.5">
+                  <div className="flex items-center gap-1.5 truncate pr-2">
+                    <FileText className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                    <span className="font-semibold text-slate-800 truncate">{r.title}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono shrink-0">{r.date}</span>
                 </div>
-              )}
+              ))
+            ) : (
+              <p className="text-slate-500 text-xs italic">Resting vitals stable; no acute hospital events logged.</p>
+            )}
+          </div>
+        </div>
+
+        {/* SECTION 6: Current Care Coordinator */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+            <span>6. Current Care Coordinator</span>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="font-semibold text-slate-900">
+                {primaryCoord?.name || "Arjun Rao"} ({primaryCoord?.relationship || "Son"}, {primaryCoord?.location || "Bengaluru"})
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Backup Authority: Dr. Meera Rao (Daughter / Physician, Boston)
+              </p>
             </div>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                isCoordAvailable
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-amber-50 text-amber-900 border-amber-200"
+              }`}
+            >
+              {isCoordAvailable ? "Active · Available" : "Away · Handover Ready"}
+            </span>
           </div>
         </div>
 
-        {/* Deliberate Emergency Access Protocol & Audit Disclosure */}
-        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600 space-y-1">
-          <div className="flex items-center justify-between text-slate-800 font-semibold">
-            <span>Accessing as: {activeUser.name} ({activeUser.relationship})</span>
-            <span className="font-mono text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">TEMPORARY READ-ONLY</span>
+        {/* SECTION 7: Access Reason & Audit Notice */}
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1.5">
+          <div className="flex items-center justify-between text-slate-900 font-bold">
+            <span>7. Access Protocol &amp; Immutable Audit Notice</span>
+            <span className="font-mono text-[10px] text-slate-500">
+              User: {activeUser.name.split(" ")[0]}
+            </span>
           </div>
-          <p className="text-slate-500 leading-relaxed">
-            Emergency medical access unlocks vital records, active prescriptions, and attending doctor contacts for triage purposes. Every export is recorded immutably in the family care audit journal.
-          </p>
-        </div>
-
-        {/* Modal Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div className="flex items-center gap-2">
-            <a
-              href={`tel:${selectedMember.emergencyContact.phone}`}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors"
-            >
-              <Phone className="w-3.5 h-3.5" /> Call Primary Attendant
-            </a>
-
-            <button
-              type="button"
-              onClick={handleShareProfile}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-xs border border-slate-200 transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied Dossier
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" /> Copy Emergency Dossier
-                </>
-              )}
-            </button>
-          </div>
-
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
+          <ul className="list-disc pl-4 space-y-0.5 text-slate-600 leading-relaxed">
+            <li>
+              <strong>Temporary &amp; Read-Only:</strong> Emergency access is granted in read-only mode to prevent unintended alteration of health records.
+            </li>
+            <li>
+              <strong>Immutable Audit Logging:</strong> Access timestamp and requesting profile are logged permanently to the family care journal.
+            </li>
+            <li>
+              <strong>Not an Emergency Service:</strong> CareLoop provides administrative coordination and records access. For life-threatening emergencies, dial 108 or 112 immediately.
+            </li>
+          </ul>
         </div>
       </div>
     </Modal>

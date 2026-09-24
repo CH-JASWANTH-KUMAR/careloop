@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
+
+const emptySubscribe = () => () => {};
 import {
   ShieldCheck,
   CheckCircle2,
@@ -127,7 +130,9 @@ export function RefillWorkflowModal({
     }
   }, [isOpen]);
 
-  if (!isOpen || !med) return null;
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+
+  if (!isOpen || !mounted || !med) return null;
 
   const handleApprove = async () => {
     setIsProcessing(true);
@@ -243,7 +248,7 @@ export function RefillWorkflowModal({
     setCurrentStepIdx(0);
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -252,9 +257,9 @@ export function RefillWorkflowModal({
           onClose();
         }
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/65 backdrop-blur-xs overflow-hidden"
     >
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3.5rem)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
           <div className="flex items-center gap-2.5">
@@ -706,6 +711,7 @@ export function RefillWorkflowModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

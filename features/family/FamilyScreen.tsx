@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
+
+const emptySubscribe = () => () => {};
 import {
   MapPin,
   Pill,
@@ -29,6 +32,7 @@ export function FamilyScreen() {
   >("overview");
   const [refillModalOpen, setRefillModalOpen] = useState(false);
   const [refillMedId, setRefillMedId] = useState("med-thyronorm");
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   const getMemberMeds = (memberId: string) => medications.filter((m) => m.patientId === memberId);
   const getMemberAppts = (memberId: string) => appointments.filter((a) => a.patientId === memberId);
@@ -221,7 +225,7 @@ export function FamilyScreen() {
       </div>
 
       {/* HEALTH DOSSIER MODAL */}
-      {selectedMember && (
+      {selectedMember && mounted && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -230,9 +234,9 @@ export function FamilyScreen() {
               setSelectedMember(null);
             }
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/65 backdrop-blur-xs overflow-hidden"
         >
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3.5rem)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Dossier Header */}
             <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between shrink-0">
               <div className="flex items-center gap-4">
@@ -496,7 +500,8 @@ export function FamilyScreen() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Refill Workflow Modal */}

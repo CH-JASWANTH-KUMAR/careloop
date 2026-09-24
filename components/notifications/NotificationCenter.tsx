@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Bell,
   Check,
@@ -27,11 +27,31 @@ export interface CareNotification {
 
 const READ_STORAGE_KEY = "careloop_read_notifications_v1";
 
-export function NotificationCenter() {
+interface NotificationCenterProps {
+  isOpen?: boolean;
+  onToggle?: () => void;
+  onClose?: () => void;
+}
+
+export function NotificationCenter({
+  isOpen: controlledIsOpen,
+  onToggle: controlledOnToggle,
+  onClose: controlledOnClose,
+}: NotificationCenterProps = {}) {
   const router = useRouter();
   const { medications, tasks, appointments, activity } = useCareLoop();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const toggleOpen = controlledOnToggle || (() => setInternalIsOpen((prev) => !prev));
+  const closeOpen = useCallback(() => {
+    if (controlledOnClose) {
+      controlledOnClose();
+    } else {
+      setInternalIsOpen(false);
+    }
+  }, [controlledOnClose]);
+
   const [readIds, setReadIds] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -161,20 +181,27 @@ export function NotificationCenter() {
     return notifications.filter((n) => !readIds.includes(n.id)).length;
   }, [notifications, readIds]);
 
-  // Click outside to close
+  // Click outside or Escape to close
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        closeOpen();
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeOpen();
       }
     }
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, closeOpen]);
 
   const handleMarkAsRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -192,7 +219,7 @@ export function NotificationCenter() {
     if (!readIds.includes(item.id)) {
       saveReadIds([...readIds, item.id]);
     }
-    setIsOpen(false);
+    closeOpen();
     router.push(item.href);
   };
 
@@ -235,7 +262,7 @@ export function NotificationCenter() {
       {/* Unified h-9 Bell Trigger Button with Attached Unread Badge */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={toggleOpen}
         className="h-9 px-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs cursor-pointer"
         aria-label={`Family Care Notifications (${unreadCount} unread)`}
         title="Notifications"
@@ -248,7 +275,7 @@ export function NotificationCenter() {
 
       {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white border border-slate-200 shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-2xl bg-white border border-slate-200 shadow-xl z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center gap-2">
@@ -274,7 +301,7 @@ export function NotificationCenter() {
               )}
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={closeOpen}
                 className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
                 aria-label="Close notifications"
               >
