@@ -43,8 +43,8 @@ export function PersonalizedGreeting({ onOpenRefillModal }: PersonalizedGreeting
 
         {/* Empathetic Family Posture Badge */}
         {greeting.attentionCount > 0 ? (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
             <span>{greeting.attentionCount} {greeting.attentionCount === 1 ? "thing needs" : "things need"} your attention</span>
           </div>
         ) : (

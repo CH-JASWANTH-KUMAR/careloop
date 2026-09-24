@@ -107,6 +107,8 @@ export function AppointmentsScreen() {
       {/* Appointment Cards */}
       {filteredAppts.length === 0 ? (
         <EmptyState
+          illustrationSrc="/images/illustrations/appointment-empty.png"
+          illustrationAlt="No Appointments Scheduled"
           icon={Calendar}
           title="No consultations scheduled in this view"
           description="We'll surface the next doctor appointment or hospital follow-up here as soon as it is scheduled."

@@ -1,10 +1,13 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ShieldCheck, LucideIcon } from "lucide-react";
 import { Button } from "./Button";
 
 interface EmptyStateProps {
   icon?: LucideIcon;
+  illustrationSrc?: string;
+  illustrationAlt?: string;
   title: string;
   description: string;
   actionLabel?: string;
@@ -16,6 +19,8 @@ interface EmptyStateProps {
 
 export function EmptyState({
   icon: Icon = ShieldCheck,
+  illustrationSrc,
+  illustrationAlt,
   title,
   description,
   actionLabel,
@@ -34,11 +39,23 @@ export function EmptyState({
     <div
       className={`p-8 sm:p-10 rounded-2xl bg-white border border-slate-200/80 text-center flex flex-col items-center justify-center space-y-3 shadow-2xs ${className}`}
     >
-      <div
-        className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${iconColors} shadow-xs`}
-      >
-        <Icon className="w-6 h-6" />
-      </div>
+      {illustrationSrc ? (
+        <div className="w-20 h-20 sm:w-24 sm:h-24 mb-1 relative">
+          <Image
+            src={illustrationSrc}
+            alt={illustrationAlt || title}
+            width={96}
+            height={96}
+            className="w-full h-full object-contain mx-auto"
+          />
+        </div>
+      ) : (
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${iconColors} shadow-xs`}
+        >
+          <Icon className="w-6 h-6" />
+        </div>
+      )}
 
       <div className="space-y-1 max-w-md">
         <h3 className="text-base font-bold text-slate-900 font-display">

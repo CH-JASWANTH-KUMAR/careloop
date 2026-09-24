@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useCoordinatorContext } from "@/hooks/useCoordinatorContext";
+import { useCareLoop } from "@/providers/AppProvider";
 
 interface RoleActionsWorkspaceProps {
   onOpenRefillModal: (medId: string) => void;
@@ -26,6 +27,12 @@ export function RoleActionsWorkspace({
   onOpenVoiceModal,
 }: RoleActionsWorkspaceProps) {
   const { activeUser } = useCoordinatorContext();
+  const { medications, appointments } = useCareLoop();
+
+  const mumMed = medications.find((m) => m.id === "med-thyronorm");
+  const mumDays = mumMed ? mumMed.remainingDays : 3;
+  const dadAppt = appointments.find((a) => a.patientId === "mem-ramesh");
+  const anitaAppt = appointments.find((a) => a.patientId === "mem-anita");
 
   const getWorkspaceConfig = () => {
     if (activeUser.id === "mem-arjun") {
@@ -38,16 +45,16 @@ export function RoleActionsWorkspace({
             title: "Refill Mum's Medication",
             description: "Review and sign off on Thyronorm 50 mcg 60-day pack with Apollo.",
             icon: <Pill className="w-5 h-5 text-emerald-600" />,
-            badge: "3 days left",
-            badgeVariant: "urgent",
+            badge: `${mumDays} days left`,
+            badgeVariant: mumDays <= 5 ? "urgent" : "healthy",
             onClick: () => onOpenRefillModal("med-thyronorm"),
           },
           {
             id: "act-apt",
             title: "Prepare Dad's Appointment",
-            description: "Collate recent vitals and question sheet for Dr. K.S. Rao (Cardiology).",
+            description: `Collate recent vitals and question sheet for ${dadAppt?.doctor || "Dr. K.S. Rao (Cardiology)"}.`,
             icon: <Calendar className="w-5 h-5 text-teal-600" />,
-            badge: "Sep 28 · 10:30 AM",
+            badge: dadAppt ? `${dadAppt.date} · ${dadAppt.time}` : "Sep 28 · 10:30 AM",
             badgeVariant: "info",
             href: "/appointments",
           },
@@ -108,9 +115,11 @@ export function RoleActionsWorkspace({
           {
             id: "act-apt-anita",
             title: "Check Upcoming Appointments",
-            description: "Review physician consultations and schedule routine health reviews.",
+            description: anitaAppt
+              ? `Review consultation packet with ${anitaAppt.doctor} at ${anitaAppt.hospital}.`
+              : "Review physician consultations and schedule routine health reviews.",
             icon: <Calendar className="w-5 h-5 text-indigo-600" />,
-            badge: "Apollo Jubilee Hills",
+            badge: anitaAppt ? `${anitaAppt.date} · ${anitaAppt.time}` : "Apollo Jubilee Hills",
             badgeVariant: "neutral",
             href: "/appointments",
           },
@@ -126,9 +135,9 @@ export function RoleActionsWorkspace({
           {
             id: "act-cardio",
             title: "View Cardiology Appointment",
-            description: "Dr. K.S. Rao follow-up consultation scheduled at Apollo Hospitals.",
+            description: `${dadAppt?.doctor || "Dr. K.S. Rao"} follow-up consultation scheduled at ${dadAppt?.hospital || "Apollo Hospitals"}.`,
             icon: <Calendar className="w-5 h-5 text-teal-600" />,
-            badge: "Sep 28 · 10:30 AM",
+            badge: dadAppt ? `${dadAppt.date} · ${dadAppt.time}` : "Sep 28 · 10:30 AM",
             badgeVariant: "info",
             href: "/appointments",
           },

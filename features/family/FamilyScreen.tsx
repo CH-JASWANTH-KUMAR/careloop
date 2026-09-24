@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   MapPin,
   Pill,
@@ -78,6 +79,30 @@ export function FamilyScreen() {
         <p className="text-sm text-slate-500 mt-1">
           Who you are caring for, their health coordinators, and active medical records.
         </p>
+      </div>
+
+      {/* Editorial Family Overview Card with Verified Illustration */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-teal-900 via-slate-900 to-slate-950 text-white shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 border border-teal-800/50">
+        <div className="space-y-2 max-w-xl">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 text-[11px] font-semibold">
+            <span>FAMILY CARE CONTINUITY</span>
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold font-display">
+            Coordinated care for the Rao family across Bengaluru and Hyderabad
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Arjun leads daily refills and vital tracking for Anita and Ramesh, backed by Dr. Meera Rao for clinical dossier review and backup coverage.
+          </p>
+        </div>
+        <div className="shrink-0 w-32 h-32 md:w-36 md:h-36 rounded-2xl overflow-hidden bg-white/10 p-2 flex items-center justify-center relative">
+          <Image
+            src="/images/illustrations/family-hero.png"
+            alt="The Rao Family Care Coordination"
+            width={144}
+            height={144}
+            className="w-full h-full object-contain"
+          />
+        </div>
       </div>
 
       {/* Member Cards Grid */}

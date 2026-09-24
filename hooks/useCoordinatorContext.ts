@@ -558,28 +558,59 @@ export function useCoordinatorContext(): CoordinatorContextType {
       },
     ];
 
-    // 10. AI Care Summary
+    // 10. AI Care Summary derived dynamically from actual state
+    const primaryCoord = members.find((m) => m.id === family?.primaryCoordinatorId);
+    const coordName = primaryCoord?.name?.split(" ")[0] || "Arjun";
+    const isCoordAvailable = family?.isCoordinatorAvailable ?? true;
+    const coordAvailabilityNote = isCoordAvailable
+      ? `${coordName} is currently available if you need help.`
+      : `${coordName} is currently away; Meera is your backup coordinator.`;
+
+    const anitaThyronorm = medications.find((m) => m.id === "med-thyronorm");
+    const thyronormDays = anitaThyronorm ? anitaThyronorm.remainingDays : 63;
+    const anitaNextAppt = appointments.find((a) => a.patientId === "mem-anita" && a.status === "UPCOMING");
+    const rameshNextAppt = appointments.find((a) => a.patientId === "mem-ramesh" && a.status === "UPCOMING");
+
     let aiSummaryText = "";
-    if (activeUser.id === "mem-arjun") {
+    if (activeUser.id === "mem-anita") {
+      if (escalatedTasks.length > 0) {
+        aiSummaryText =
+          `Anita, automated routines are paused while ${coordName} reviews your reported dizziness. Please rest and stay seated while family coordination is in progress.`;
+      } else if (thyronormDays <= 5) {
+        aiSummaryText =
+          `Good morning, Anita. Your morning routine is on track. Your Thyronorm supply has ${thyronormDays} days remaining, and a refill request is active with Apollo Pharmacy Jubilee Hills. Your next appointment with ${anitaNextAppt ? `${anitaNextAppt.doctor} is on ${anitaNextAppt.date}` : "Dr. Sumathi Reddy is on October 7"}. ${coordAvailabilityNote}`;
+      } else {
+        aiSummaryText =
+          `Good morning, Anita. Your morning routine is on track. Your Thyronorm supply is sufficient for the next ${thyronormDays} days, your blood-pressure logs are stable, and your next appointment with ${anitaNextAppt ? `${anitaNextAppt.doctor} is on ${anitaNextAppt.date}` : "Dr. Sumathi Reddy is on October 7"}. ${coordAvailabilityNote}`;
+      }
+    } else if (activeUser.id === "mem-ramesh") {
+      if (escalatedTasks.length > 0) {
+        aiSummaryText =
+          `Ramesh, your cardiac logs are steady, but Anita reported dizziness today. Automated workflows are paused for family evaluation. ${coordName} is coordinating.`;
+      } else {
+        aiSummaryText =
+          `Good morning, Ramesh. Your post-PTCA cardiac recovery regimen is on schedule. Glycomet and Ecosprin logs are stable, and your next appointment with ${rameshNextAppt ? `${rameshNextAppt.doctor} is on ${rameshNextAppt.date}` : "Dr. K.S. Rao is on October 12"}. ${coordAvailabilityNote}`;
+      }
+    } else if (activeUser.id === "mem-meera") {
+      if (escalatedTasks.length > 0) {
+        aiSummaryText =
+          `Dr. Meera, clinical attention is flagged: Mum reported dizziness during morning check-in. Automated workflows are held pending human assessment. ${coordName} is on standby.`;
+      } else {
+        aiSummaryText =
+          `${coordName} is managing primary coordination from Bengaluru. Mum's Thyronorm has ${thyronormDays} days of supply tracked, and Dad's ${rameshNextAppt ? rameshNextAppt.speciality.toLowerCase() : "cardiology"} dossier is prepared for Dr. K.S. Rao review. ${coordAvailabilityNote}`;
+      }
+    } else {
+      // Arjun (Primary Coordinator)
       if (escalatedTasks.length > 0) {
         aiSummaryText =
           "Attention needed: Anita reported dizziness during her morning check-in. Automated workflows have been paused. Please call Mum and arrange a medical follow-up.";
       } else if (lowStockMeds.length > 0) {
         aiSummaryText =
-          "Your family is mostly on track today. Mum's Thyronorm refill is ready for sign-off (3 days remaining), and Dad's post-stent cardiology review is coming up in 5 days with pre-visit vitals collated. Nothing else urgent is pending.";
+          `Your family is mostly on track today. Mum's Thyronorm refill is ready for sign-off (${thyronormDays} days remaining), and Dad's post-stent cardiology review is coming up with pre-visit vitals collated. Nothing else urgent is pending.`;
       } else {
         aiSummaryText =
-          "All family healthcare workflows are in good order. Both parents have sufficient medication supply, and doctor consultation dossiers are organized.";
+          `All family healthcare workflows are in good order. Both parents have sufficient medication supply (${thyronormDays} days of Thyronorm for Mum), and doctor consultation dossiers are organized.`;
       }
-    } else if (activeUser.id === "mem-meera") {
-      aiSummaryText =
-        "Arjun is handling active coordination from Bengaluru. Mum's thyroid medication refill is being processed with Apollo Pharmacy, and Dad's cardiology history is ready for your clinical review.";
-    } else if (activeUser.id === "mem-anita") {
-      aiSummaryText =
-        "Your morning routine is going well. Arjun and CareLoop have arranged your Thyronorm 50mcg refill with Apollo Pharmacy, and Delhivery cold-chain express will deliver to Jubilee Hills.";
-    } else {
-      aiSummaryText =
-        "Your cardiac recovery regimen is stable. Glycomet and Ecosprin are on track, and your appointment packet for Dr. K.S. Rao has been prepared by Arjun.";
     }
 
     const aiSummary = {
@@ -595,7 +626,7 @@ export function useCoordinatorContext(): CoordinatorContextType {
       contextualShortcuts = [
         {
           id: "cs-1",
-          label: "Refill Mum's Thyronorm (3 days left) →",
+          label: thyronormDays <= 5 ? `Refill Mum's Thyronorm (${thyronormDays} days left) →` : `Check Mum's Thyronorm stock (${thyronormDays} days) →`,
           actionType: "REFILL_MODAL",
           medId: "med-thyronorm",
         },

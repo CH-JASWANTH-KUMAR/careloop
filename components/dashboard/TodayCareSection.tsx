@@ -43,8 +43,8 @@ export function TodayCareSection({
         </div>
 
         {urgentIssues.length > 0 ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
             <span>{urgentIssues.length} {urgentIssues.length === 1 ? "item needs" : "items need"} attention</span>
           </span>
         ) : (

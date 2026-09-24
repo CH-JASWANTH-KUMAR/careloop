@@ -7,10 +7,8 @@ import {
   CheckCheck,
   Pill,
   Calendar,
-  Truck,
   AlertTriangle,
   ClipboardList,
-  Volume2,
   X,
   ExternalLink,
 } from "lucide-react";
@@ -19,7 +17,7 @@ import { useCareLoop } from "@/providers/AppProvider";
 
 export interface CareNotification {
   id: string;
-  category: "MEDICATION" | "APPOINTMENT" | "DELIVERY" | "SYMPTOM" | "TASK" | "VOICE";
+  category: "MEDICATION" | "APPOINTMENT" | "CARE" | "SAFETY";
   title: string;
   description: string;
   timestamp: string;
@@ -56,43 +54,89 @@ export function NotificationCenter() {
     }
   };
 
-  // Derive notifications from live store data
+  // Derive notifications from live store data with real healthcare provenance
   const notifications: CareNotification[] = useMemo(() => {
     const list: CareNotification[] = [];
 
-    // 1. Symptom / Escalated tasks
+    // 1. Safety Alerts & Acute Escalations
     const escalatedTasks = tasks.filter(
       (t) => t.status === "ESCALATED" || t.source === "VOICE_ESCALATION"
     );
-    escalatedTasks.forEach((t) => {
-      list.push({
-        id: `notif-symptom-${t.id}`,
-        category: "SYMPTOM",
-        title: "Possible Symptom Reported",
-        description: t.title,
-        timestamp: "Just now",
-        href: "/tasks",
-        isUrgent: true,
+    if (escalatedTasks.length > 0) {
+      escalatedTasks.forEach((t) => {
+        list.push({
+          id: `notif-safety-${t.id}`,
+          category: "SAFETY",
+          title: "Wellness check requires attention",
+          description: t.title || "Anita reported dizziness during morning check-in. Automated workflows paused.",
+          timestamp: "Today",
+          href: "/tasks",
+          isUrgent: true,
+        });
       });
-    });
+    }
 
-    // 2. Medication shortages
-    const lowStockMeds = medications.filter(
-      (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
+    // 2. Medication Notifications
+    const thyronormMed = medications.find((m) => m.id === "med-thyronorm");
+    const hasActiveDelivery = tasks.some(
+      (t) => (t.status === "IN_PROGRESS" || t.status === "WAITING") && t.source === "REFILL_TRIGGER"
     );
-    lowStockMeds.forEach((m) => {
+    if (hasActiveDelivery || (thyronormMed && thyronormMed.remainingDays > 10)) {
       list.push({
-        id: `notif-med-${m.id}`,
+        id: "notif-med-refill-confirmed",
         category: "MEDICATION",
-        title: `${m.name} supply running low`,
-        description: `Only ${m.remainingDays} days of medication remaining. Refill coordination needed.`,
-        timestamp: "1h ago",
-        href: "/medications",
-        isUrgent: true,
+        title: "Thyronorm refill confirmed",
+        description: "Apollo Pharmacy Jubilee Hills dispatch verified. Delhivery tracking live.",
+        timestamp: "2 min ago",
+        href: "/care",
       });
+    } else {
+      const lowStockMeds = medications.filter(
+        (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
+      );
+      lowStockMeds.forEach((m) => {
+        list.push({
+          id: `notif-med-${m.id}`,
+          category: "MEDICATION",
+          title: `${m.name} supply running low`,
+          description: `Only ${m.remainingDays} days of medication remaining. Refill coordination needed.`,
+          timestamp: "10 min ago",
+          href: "/medications",
+          isUrgent: true,
+        });
+      });
+    }
+
+    // 3. Appointment Notifications
+    const primaryAppt = appointments.find((a) => a.status === "UPCOMING");
+    if (primaryAppt) {
+      list.push({
+        id: `notif-appt-${primaryAppt.id}`,
+        category: "APPOINTMENT",
+        title: `${primaryAppt.doctor} appointment confirmed`,
+        description: `Scheduled for ${primaryAppt.date} at ${primaryAppt.time} (${primaryAppt.hospital}). Pre-visit records assembled.`,
+        timestamp: "1 hr ago",
+        href: "/appointments",
+      });
+    }
+
+    // 4. Care Actions & Completed Check-ins
+    const recentCheckin = activity.find(
+      (ev) =>
+        ev.actionType.includes("VOICE") ||
+        ev.actionType.includes("VERIFIED") ||
+        ev.actor.id === "mem-arjun"
+    );
+    list.push({
+      id: "notif-care-checkin",
+      category: "CARE",
+      title: "Arjun completed your medication check-in",
+      description: recentCheckin?.description || "Morning routine logged and verified with resting vitals.",
+      timestamp: "3 hrs ago",
+      href: "/activity",
     });
 
-    // 3. Pending approvals
+    // 5. Additional Pending Approvals
     const approvalTasks = tasks.filter(
       (t) =>
         t.status === "WAITING_FOR_APPROVAL" ||
@@ -100,60 +144,15 @@ export function NotificationCenter() {
     );
     approvalTasks.forEach((t) => {
       list.push({
-        id: `notif-task-${t.id}`,
-        category: "TASK",
-        title: "Care Action Needs Sign-Off",
+        id: `notif-approval-${t.id}`,
+        category: "CARE",
+        title: "Care action awaiting sign-off",
         description: t.title,
-        timestamp: "2h ago",
-        href: "/tasks",
+        timestamp: "4 hrs ago",
+        href: "/care",
         isUrgent: true,
       });
     });
-
-    // 4. Upcoming appointments
-    const upcomingApts = appointments.filter((a) => a.status === "UPCOMING");
-    upcomingApts.forEach((a) => {
-      list.push({
-        id: `notif-apt-${a.id}`,
-        category: "APPOINTMENT",
-        title: `Cardiology Consultation Tomorrow`,
-        description: `With ${a.doctor} at ${a.hospital} (${a.time || "10:30 AM"}). Preparation packet ready.`,
-        timestamp: "3h ago",
-        href: "/appointments",
-      });
-    });
-
-    // 5. In-flight logistics
-    const inFlightTasks = tasks.filter(
-      (t) => t.status === "IN_PROGRESS" || t.status === "WAITING"
-    );
-    if (inFlightTasks.length > 0) {
-      list.push({
-        id: "notif-delivery-active",
-        category: "DELIVERY",
-        title: "Pharmacy Delivery Dispatched",
-        description: "Delhivery cold-chain courier in transit to Jubilee Hills (4.2°C logged).",
-        timestamp: "4h ago",
-        href: "/care",
-      });
-    }
-
-    // 6. Recent voice check from activity
-    const recentVoice = activity.find(
-      (ev) =>
-        ev.actionType === "VOICE_CALL_COMPLETED" ||
-        ev.actionType === "VOICE_ESCALATION_TRIGGERED"
-    );
-    if (recentVoice) {
-      list.push({
-        id: `notif-voice-${recentVoice.id}`,
-        category: "VOICE",
-        title: "Gnani Voice Wellness Check Logged",
-        description: recentVoice.description,
-        timestamp: "5h ago",
-        href: "/activity",
-      });
-    }
 
     return list;
   }, [medications, tasks, appointments, activity]);
@@ -197,40 +196,54 @@ export function NotificationCenter() {
     router.push(item.href);
   };
 
-  const getCategoryIcon = (category: CareNotification["category"]) => {
+  const getCategoryBadge = (category: CareNotification["category"]) => {
     switch (category) {
-      case "SYMPTOM":
-        return <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />;
+      case "SAFETY":
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+            <span>Safety</span>
+          </span>
+        );
       case "MEDICATION":
-        return <Pill className="w-4 h-4 text-amber-600 shrink-0" />;
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            <Pill className="w-3 h-3 text-amber-600 shrink-0" />
+            <span>Medication</span>
+          </span>
+        );
       case "APPOINTMENT":
-        return <Calendar className="w-4 h-4 text-teal-600 shrink-0" />;
-      case "DELIVERY":
-        return <Truck className="w-4 h-4 text-indigo-600 shrink-0" />;
-      case "VOICE":
-        return <Volume2 className="w-4 h-4 text-emerald-600 shrink-0" />;
-      case "TASK":
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+            <Calendar className="w-3 h-3 text-teal-600 shrink-0" />
+            <span>Appointment</span>
+          </span>
+        );
+      case "CARE":
       default:
-        return <ClipboardList className="w-4 h-4 text-slate-600 shrink-0" />;
+        return (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+            <ClipboardList className="w-3 h-3 text-slate-600 shrink-0" />
+            <span>Care</span>
+          </span>
+        );
     }
   };
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Trigger Button */}
+      {/* Unified h-9 Bell Trigger Button with Attached Unread Badge */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors"
-        aria-label="Family Care Notifications"
-        title="Care Notifications"
+        className="h-9 px-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs cursor-pointer"
+        aria-label={`Family Care Notifications (${unreadCount} unread)`}
+        title="Notifications"
       >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none animate-pulse">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
+        <Bell className="w-4 h-4 text-slate-600 shrink-0" />
+        <span className="min-w-4 h-4 px-1 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+          {unreadCount}
+        </span>
       </button>
 
       {/* Dropdown Popover */}
@@ -239,7 +252,7 @@ export function NotificationCenter() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-slate-900">Care Updates</span>
+              <span className="font-semibold text-sm text-slate-900">Notifications</span>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200/60">
                   {unreadCount} new
@@ -252,7 +265,7 @@ export function NotificationCenter() {
                 <button
                   type="button"
                   onClick={handleMarkAllAsRead}
-                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 px-2 py-1 rounded-md hover:bg-slate-200/60 transition-colors"
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 px-2 py-1 rounded-md hover:bg-slate-200/60 transition-colors cursor-pointer"
                   title="Mark all as read"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
@@ -262,7 +275,7 @@ export function NotificationCenter() {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 cursor-pointer"
                 aria-label="Close notifications"
               >
                 <X className="w-4 h-4" />
@@ -288,7 +301,7 @@ export function NotificationCenter() {
                       isRead ? "bg-white hover:bg-slate-50" : "bg-emerald-50/20 hover:bg-emerald-50/40"
                     }`}
                   >
-                    <div className="mt-0.5">{getCategoryIcon(item.category)}</div>
+                    <div className="mt-0.5">{getCategoryBadge(item.category)}</div>
 
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center justify-between gap-2">

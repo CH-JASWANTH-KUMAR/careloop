@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -253,8 +254,16 @@ export function CareScreen() {
             ))}
 
             {lowStockMeds.length === 0 && needsApprovalTasks.length === 0 && (
-              <div className="p-6 text-center rounded-xl border border-dashed border-slate-200 text-xs text-slate-400">
-                No approvals pending.
+              <div className="p-6 text-center rounded-xl border border-dashed border-slate-200 text-xs text-slate-500 space-y-2">
+                <Image
+                  src="/images/illustrations/all-caught-up.png"
+                  alt="All caught up"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 object-contain mx-auto opacity-90"
+                />
+                <p className="font-semibold text-slate-700">All caught up</p>
+                <p className="text-[11px] text-slate-400">No approvals or refills pending human sign-off.</p>
               </div>
             )}
           </div>

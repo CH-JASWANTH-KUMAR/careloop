@@ -22,6 +22,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { formatDate } from "@/lib/utils";
 import { MedicalTimelineView } from "./MedicalTimelineView";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const PIPELINE_STEPS: { status: DocumentPipelineStatus; label: string }[] = [
   { status: "UPLOADED", label: "Uploaded" },
@@ -355,9 +356,13 @@ export function HealthRecordsScreen() {
             })}
 
             {filteredRecords.length === 0 && (
-              <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-                No health records matched your current query or filter.
-              </div>
+              <EmptyState
+                illustrationSrc="/images/illustrations/lab-report-empty.png"
+                illustrationAlt="No Clinical Documents"
+                title="No health records found in this view"
+                description="Upload hospital discharge summaries, lab reports, or doctor prescriptions to keep the family clinical folder complete."
+                variant="calm"
+              />
             )}
           </div>
         </div>

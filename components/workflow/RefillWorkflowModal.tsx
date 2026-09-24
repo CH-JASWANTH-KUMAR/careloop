@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -457,6 +458,23 @@ export function RefillWorkflowModal({
               </div>
 
               {/* Courier Timeline Stepper */}
+              {/* Delivery Tracking Banner */}
+              <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <Image
+                  src="/images/illustrations/delivery-tracking.png"
+                  alt="Delhivery Cold-Chain Logistics"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 object-contain shrink-0"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-slate-900">Delhivery Express Cold-Chain</div>
+                  <div className="text-slate-500 text-[11px] leading-relaxed">
+                    Active temperature telemetry (4.2°C logged) with doorstep handover protocol in Jubilee Hills.
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">

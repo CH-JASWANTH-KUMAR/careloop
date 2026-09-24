@@ -134,8 +134,11 @@ export function Sidebar() {
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" aria-label="Main Navigation">
+      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto" aria-label="Main Navigation">
         <div className="space-y-1">
+          <div className="px-3 pb-1 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold">
+            MAIN
+          </div>
           {primaryNavItems.map((item) => {
             const isActive = isItemActive(item.href);
             const Icon = item.icon;
@@ -145,17 +148,17 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900",
+                  "flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600",
                   isActive
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    ? "bg-teal-50/80 text-teal-950 font-bold border-l-3 border-teal-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <Icon
                     className={cn(
                       "w-4 h-4 transition-colors",
-                      isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-900"
+                      isActive ? "text-teal-700" : "text-slate-400 group-hover:text-slate-700"
                     )}
                   />
                   <span>{item.label}</span>
@@ -166,8 +169,8 @@ export function Sidebar() {
                     className={cn(
                       "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold",
                       isActive
-                        ? "bg-rose-500 text-white"
-                        : "bg-rose-100 text-rose-800"
+                        ? "bg-teal-200/80 text-teal-900"
+                        : "bg-amber-100 text-amber-900 border border-amber-200"
                     )}
                   >
                     {item.badge}
@@ -178,10 +181,10 @@ export function Sidebar() {
           })}
         </div>
 
-        {/* Secondary Navigation */}
-        <div className="pt-4 mt-4 border-t border-slate-100 space-y-1">
-          <div className="px-3 pb-1 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold">
-            Preferences
+        {/* System Navigation */}
+        <div className="pt-2 border-t border-slate-100 space-y-1">
+          <div className="px-3 pb-1 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold">
+            SYSTEM
           </div>
           {secondaryNavItems.map((item) => {
             const isActive = isItemActive(item.href);
@@ -192,17 +195,17 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900",
+                  "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600",
                   isActive
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    ? "bg-teal-50/80 text-teal-950 font-bold border-l-3 border-teal-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <Icon
                     className={cn(
                       "w-4 h-4 transition-colors",
-                      isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700"
+                      isActive ? "text-teal-700" : "text-slate-400 group-hover:text-slate-700"
                     )}
                   />
                   <span>{item.label}</span>

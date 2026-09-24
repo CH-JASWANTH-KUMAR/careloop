@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 import { FamilyAvatar } from "@/components/ui/FamilyAvatar";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export function MedicationsScreen() {
   const { medications, members, activeUser } = useCareLoop();
@@ -73,8 +74,17 @@ export function MedicationsScreen() {
       </div>
 
       {/* Medication Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {filteredMeds.map((med) => {
+      {filteredMeds.length === 0 ? (
+        <EmptyState
+          illustrationSrc="/images/illustrations/medication-empty.png"
+          illustrationAlt="No Active Medications"
+          title="No medications found in this view"
+          description="All active prescriptions, dosages, and refill schedules will be tracked here."
+          variant="calm"
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filteredMeds.map((med) => {
           const patient = members.find((m) => m.id === med.patientId);
           const isLowStock = med.remainingDays <= 5;
           const percentage = Math.min(
@@ -233,7 +243,8 @@ export function MedicationsScreen() {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* 7-Step End-to-End Refill Workflow Modal */}
       {selectedMedIdForRefill && (
