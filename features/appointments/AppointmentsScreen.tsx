@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Tabs } from "@/components/ui/Tabs";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
 
 export function AppointmentsScreen() {
@@ -44,7 +45,7 @@ export function AppointmentsScreen() {
               Pre-Appointment Dossiers
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-display">
             Appointments
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -84,10 +85,18 @@ export function AppointmentsScreen() {
       </div>
 
       {/* Appointment Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {filteredAppts.map((appt) => {
-          const patient = members.find((m) => m.id === appt.patientId);
-          const relatedRecs = records.filter((r) => appt.relatedRecordIds.includes(r.id));
+      {filteredAppts.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="No consultations scheduled in this view"
+          description="We'll surface the next doctor appointment or hospital follow-up here as soon as it is scheduled."
+          variant="calm"
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filteredAppts.map((appt) => {
+            const patient = members.find((m) => m.id === appt.patientId);
+            const relatedRecs = records.filter((r) => appt.relatedRecordIds.includes(r.id));
 
           return (
             <div
@@ -189,6 +198,7 @@ export function AppointmentsScreen() {
           );
         })}
       </div>
+      )}
 
       {/* "Before This Appointment" Pre-visit Packet Modal */}
       <Modal

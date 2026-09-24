@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  PhoneCall,
   ShieldAlert,
   Phone,
   CheckCircle2,
@@ -14,11 +13,14 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useCareLoop } from "@/providers/AppProvider";
+import { useCoordinatorContext } from "@/hooks/useCoordinatorContext";
+import { VoiceCareButton } from "@/components/voice/VoiceCareButton";
 import { gnaniVoiceProvider } from "@/services/voice/VoiceProvider";
 
 export function Header() {
   const pathname = usePathname();
   const { members, family, logActivity, addTask } = useCareLoop();
+  const { greeting, activeUser } = useCoordinatorContext();
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [isVoiceCalling, setIsVoiceCalling] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
@@ -121,18 +123,34 @@ export function Header() {
       <div className="flex items-center gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-900">{pageTitle}</span>
+            <span className="text-sm font-bold text-slate-900 font-display">{pageTitle}</span>
             <span className="text-slate-300">•</span>
-            <span className="text-xs font-medium text-slate-600">{family?.name || "The Rao Family"}</span>
+            <span className="text-xs font-semibold text-slate-600">Your family ({family?.name || "The Rao Family"})</span>
           </div>
-          <p className="text-[11px] text-slate-400 hidden sm:block">
-            {family?.primaryCity || "Hyderabad & Bengaluru"} · {members.length} family members
+          <p className="text-[11px] text-slate-500 hidden sm:block">
+            Viewing as <span className="font-semibold text-slate-700">{activeUser.name}</span> ({activeUser.relationship}) · {family?.primaryCity || "Hyderabad & Bengaluru"}
           </p>
         </div>
       </div>
 
-      {/* Right: Secondary Actions (Coordinator Availability, Voice Check, Emergency Access) */}
+      {/* Right: Actions (Attention Badge, Coordinator Status, Voice Check, Emergency Access) */}
       <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* Dynamic Contextual Attention Pill */}
+        {greeting.attentionCount > 0 ? (
+          <Link
+            href="/care"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+            <span>{greeting.attentionCount} {greeting.attentionCount === 1 ? "thing needs attention" : "things need attention"}</span>
+          </Link>
+        ) : (
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <span>All caught up</span>
+          </span>
+        )}
+
         {/* Care Coordinator Availability Status */}
         <Link
           href="/continuity"
@@ -158,42 +176,17 @@ export function Header() {
           )}
         </Link>
 
-        {/* If Voice Check is active/completed, show small status indicator without covering the screen */}
-        {voiceCallResult && !isVoiceModalOpen && (
-          <button
-            onClick={() => setIsVoiceModalOpen(true)}
-            className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-sky-200 bg-sky-50 text-sky-800 text-xs font-medium hover:bg-sky-100 transition-colors"
-            title="View Voice Check conversation details"
-          >
-            <PhoneCall className="w-3 h-3 text-sky-600" />
-            <span>Voice Check:</span>
-            <span className="font-semibold">
-              {voiceCallResult.extractedOutcome?.escalationTriggered ? "Escalation" : "Stock Confirmed"}
-            </span>
-          </button>
-        )}
-
         {/* Voice Coordination Check Trigger */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleSimulateVoiceCheck(false)}
-          isLoading={isVoiceCalling}
-          className="text-xs border-slate-200 hover:bg-slate-50 text-slate-700 h-8"
-          title="Simulate outbound Gnani conversational voice check"
-        >
-          <PhoneCall className="w-3.5 h-3.5 text-slate-500" />
-          <span className="hidden sm:inline">Voice Check</span>
-        </Button>
+        <VoiceCareButton variant="header" />
 
         {/* Emergency Info Modal Trigger */}
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsEmergencyOpen(true)}
-          className="text-xs border-slate-200 text-slate-700 hover:bg-red-50 hover:text-red-700 hover:border-red-200 h-8"
+          className="text-xs border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 h-8"
         >
-          <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+          <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
           <span className="hidden sm:inline">Emergency Access</span>
         </Button>
       </div>

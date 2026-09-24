@@ -9,9 +9,13 @@ import {
   History,
   Settings,
   HeartHandshake,
+  Bot,
+  MapPin,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCareLoop } from "@/providers/AppProvider";
+import { CareLoopLogo } from "@/components/ui/CareLoopLogo";
 
 interface NavItem {
   label: string;
@@ -23,7 +27,7 @@ interface NavItem {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { tasks, medications, activeUser, members, switchActiveUser } = useCareLoop();
+  const { tasks, medications, activeUser, members, switchActiveUser, family } = useCareLoop();
 
   const urgentTasksCount = tasks.filter(
     (t) => t.status === "NEEDS_ATTENTION" || t.status === "WAITING_FOR_APPROVAL"
@@ -33,9 +37,6 @@ export function Sidebar() {
     (m) => m.remainingDays <= 5 && m.status === "ACTIVE"
   ).length;
 
-  // The store's useSyncExternalStore-based `mounted` flag already ensures
-  // medications and tasks return seed defaults on SSR/first paint, so this
-  // derived value is always hydration-safe without a per-component guard.
   const totalNeedsAttention = urgentTasksCount + urgentMedsCount;
 
   const primaryNavItems: NavItem[] = [
@@ -55,6 +56,11 @@ export function Sidebar() {
       icon: HeartHandshake,
       badge: totalNeedsAttention > 0 ? totalNeedsAttention : undefined,
       badgeVariant: "urgent",
+    },
+    {
+      label: "Care Agent",
+      href: "/agent",
+      icon: Bot,
     },
     {
       label: "Activity",
@@ -82,47 +88,49 @@ export function Sidebar() {
     return false;
   };
 
+  const isCoordinator = activeUser.id === family?.primaryCoordinatorId;
+
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-slate-200 bg-white sticky top-0 h-screen shrink-0 z-20 select-none">
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
         <Link
           href="/"
-          className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 rounded-lg p-0.5"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 rounded-lg p-0.5"
         >
-          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-xs">
-            <HeartHandshake className="w-5 h-5 text-teal-400" />
-          </div>
-          <div>
-            <span className="font-bold text-slate-900 tracking-tight text-base block leading-tight">
-              CareLoop
-            </span>
-            <p className="text-[11px] text-slate-500 font-medium">Family Health Coordination</p>
-          </div>
+          <CareLoopLogo size="md" />
         </Link>
       </div>
 
       {/* Active User Persona Context */}
-      <div className="p-3 mx-3 mt-3 bg-slate-50 border border-slate-200 rounded-xl shrink-0">
-        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5 font-medium">
-          <span>Active Coordinator</span>
-          <span className="text-teal-700 font-semibold">{activeUser.role.replace(/_/g, " ")}</span>
+      <div className="p-3 mx-3 mt-3 bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200/80 rounded-xl shrink-0 shadow-2xs">
+        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1.5 font-bold uppercase tracking-wider">
+          <span>Active Perspective</span>
+          <span className="text-teal-700 font-mono">
+            {isCoordinator ? "Primary Coordinator" : activeUser.role.replace(/_/g, " ")}
+          </span>
         </div>
-        <select
-          value={activeUser.id}
-          onChange={(e) => switchActiveUser(e.target.value)}
-          className="w-full text-xs font-semibold bg-white border border-slate-200 rounded-md py-1.5 px-2 text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900"
-          aria-label="Switch family member context"
-        >
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} ({m.relationship})
-            </option>
-          ))}
-        </select>
-        <p className="text-[10px] text-slate-400 mt-1 truncate">
-          Managing for Anita &amp; Ramesh Rao (Hyd)
-        </p>
+
+        <div className="relative">
+          <select
+            value={activeUser.id}
+            onChange={(e) => switchActiveUser(e.target.value)}
+            className="w-full text-xs font-bold bg-white border border-slate-200 rounded-lg py-2 pl-2.5 pr-7 text-slate-900 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-900 appearance-none shadow-2xs"
+            aria-label="Switch family member perspective"
+          >
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.relationship})
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+
+        <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium mt-1.5 px-0.5 truncate">
+          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+          <span className="truncate">{activeUser.location}</span>
+        </div>
       </div>
 
       {/* Main Navigation */}
@@ -147,7 +155,7 @@ export function Sidebar() {
                   <Icon
                     className={cn(
                       "w-4 h-4 transition-colors",
-                      isActive ? "text-white" : "text-slate-500 group-hover:text-slate-900"
+                      isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-900"
                     )}
                   />
                   <span>{item.label}</span>
@@ -158,8 +166,8 @@ export function Sidebar() {
                     className={cn(
                       "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold",
                       isActive
-                        ? "bg-white/20 text-white"
-                        : "bg-red-100 text-red-700"
+                        ? "bg-rose-500 text-white"
+                        : "bg-rose-100 text-rose-800"
                     )}
                   >
                     {item.badge}
@@ -173,7 +181,7 @@ export function Sidebar() {
         {/* Secondary Navigation */}
         <div className="pt-4 mt-4 border-t border-slate-100 space-y-1">
           <div className="px-3 pb-1 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold">
-            Settings
+            Preferences
           </div>
           {secondaryNavItems.map((item) => {
             const isActive = isItemActive(item.href);
@@ -184,7 +192,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900",
+                  "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900",
                   isActive
                     ? "bg-slate-900 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -207,7 +215,7 @@ export function Sidebar() {
 
       {/* Subtle Support Note */}
       <div className="p-3 m-3 text-center border-t border-slate-100 shrink-0">
-        <p className="text-[10px] text-slate-400">CareLoop Family Circle</p>
+        <p className="text-[10px] text-slate-400 font-medium">CareLoop · The Rao Family</p>
       </div>
     </aside>
   );

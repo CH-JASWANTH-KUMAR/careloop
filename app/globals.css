@@ -71,8 +71,31 @@
   border-color: #cbd5e1;
 }
 
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
 .mono-tag {
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.72rem;
   letter-spacing: 0.03em;
+}
+
+/* Subtle care glow effects */
+.glow-teal-subtle {
+  box-shadow: 0 0 20px -5px rgba(13, 148, 136, 0.15);
+}
+
+.glow-rose-subtle {
+  box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.15);
+}
+
+/* Care timeline connector line */
+.timeline-stem {
+  position: absolute;
+  top: 1.5rem;
+  bottom: 0;
+  left: 1.125rem;
+  width: 2px;
+  background: linear-gradient(180deg, #cbd5e1 0%, #e2e8f0 100%);
 }

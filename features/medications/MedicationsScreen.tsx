@@ -58,7 +58,7 @@ export function MedicationsScreen() {
               Stock & Refill Coordination
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-display">
             Medications
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">

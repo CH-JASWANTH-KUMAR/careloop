@@ -71,11 +71,11 @@ export function FamilyScreen() {
     <div className="space-y-8 max-w-5xl mx-auto pb-12">
       {/* Header */}
       <div className="pb-4 border-b border-slate-200">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-display">
           The Rao Family
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Who you are responsible for, their care leads, and active health dossiers.
+          Who you are caring for, their health coordinators, and active medical records.
         </p>
       </div>
 

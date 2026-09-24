@@ -170,7 +170,7 @@ export function HealthRecordsScreen() {
               OCR &amp; Human-in-the-Loop Verification
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Health Records</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-display">Health Records</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Prescriptions, diagnostics, and summaries with transparent OCR extraction pipelines and
             verified timelines.

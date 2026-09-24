@@ -149,8 +149,8 @@ export function CareContinuityScreen() {
             </span>
             <span className="text-xs text-slate-400 font-mono">Anti-Fragile Family Health</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            Care Continuity & Handover
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 font-display">
+            Care Continuity &amp; Handover
           </h1>
           <p className="text-sm text-slate-500 mt-1 max-w-2xl">
             Care should not depend on one family member remembering everything. CareLoop guarantees
