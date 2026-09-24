@@ -15,9 +15,16 @@ import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 import { FamilyAvatar } from "@/components/ui/FamilyAvatar";
 
 export function MedicationsScreen() {
-  const { medications, members } = useCareLoop();
-  const [filterPatient, setFilterPatient] = useState<string>("ALL");
+  const { medications, members, activeUser } = useCareLoop();
+  const [customPatientFilter, setCustomPatientFilter] = useState<{ userId: string; filter: string } | null>(null);
   const [selectedMedIdForRefill, setSelectedMedIdForRefill] = useState<string | null>(null);
+
+  const filterPatient =
+    customPatientFilter?.userId === activeUser?.id
+      ? customPatientFilter.filter
+      : activeUser?.role === "DEPENDENT"
+      ? activeUser.id
+      : "ALL";
 
   const filteredMeds = medications.filter((m) => {
     if (filterPatient !== "ALL" && m.patientId !== filterPatient) return false;
@@ -53,7 +60,7 @@ export function MedicationsScreen() {
             { id: "mem-ramesh", label: "Ramesh (Father)", count: medications.filter((m) => m.patientId === "mem-ramesh").length },
           ]}
           activeTab={filterPatient}
-          onChange={setFilterPatient}
+          onChange={(val) => setCustomPatientFilter({ userId: activeUser?.id || "", filter: val })}
         />
       </div>
 

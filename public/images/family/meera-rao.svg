@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg-meera" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fae8ff"/>
+      <stop offset="100%" stop-color="#e9d5ff"/>
+    </linearGradient>
+    <linearGradient id="scrubs-meera" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#115e59"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#bg-meera)" stroke="#a855f7" stroke-width="2"/>
+
+  <!-- Long Hair back -->
+  <path d="M34 50 C32 80, 40 98, 48 104 L72 104 C80 98, 88 80, 86 50 Z" fill="#1e1b4b"/>
+
+  <!-- Neck & Shoulders -->
+  <rect x="52" y="68" width="16" height="18" rx="4" fill="#fcd34d" opacity="0.8"/>
+  <path d="M26 108 C28 84, 42 78, 60 78 C78 78, 92 84, 94 108 Z" fill="url(#scrubs-meera)"/>
+  
+  <!-- Stethoscope around neck -->
+  <path d="M48 80 C48 94, 54 98, 60 98 C66 98, 72 94, 72 80" stroke="#cbd5e1" stroke-width="2.5" fill="none"/>
+  <circle cx="60" cy="101" r="3.5" fill="#94a3b8" stroke="#cbd5e1" stroke-width="1"/>
+
+  <!-- Head -->
+  <ellipse cx="60" cy="54" rx="20" ry="23" fill="#fde68a"/>
+
+  <!-- Hair front (elegant parted hair) -->
+  <path d="M38 52 C40 34, 52 30, 60 32 C68 30, 80 34, 82 52 C78 40, 68 36, 60 38 C52 36, 42 40, 38 52 Z" fill="#1e1b4b"/>
+  <path d="M38 52 C36 65, 40 75, 44 82 C42 74, 40 66, 42 58 Z" fill="#1e1b4b"/>
+  <path d="M82 52 C84 65, 80 75, 76 82 C78 74, 80 66, 78 58 Z" fill="#1e1b4b"/>
+
+  <!-- Eyebrows -->
+  <path d="M46 48 Q50 46 54 48" stroke="#312e81" stroke-width="1.8" fill="none"/>
+  <path d="M66 48 Q70 46 74 48" stroke="#312e81" stroke-width="1.8" fill="none"/>
+
+  <!-- Eyes -->
+  <circle cx="50" cy="54" r="2" fill="#0f172a"/>
+  <circle cx="70" cy="54" r="2" fill="#0f172a"/>
+
+  <!-- Small Bindi -->
+  <circle cx="60" cy="46" r="1.5" fill="#7e22ce"/>
+
+  <!-- Physician Warm Smile -->
+  <path d="M54 65 Q60 69 66 65" fill="none" stroke="#b45309" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

@@ -18,6 +18,7 @@ import { FamilyMember } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
+import { FamilyAvatar } from "@/components/ui/FamilyAvatar";
 
 export function FamilyScreen() {
   const { members, medications, appointments, records, tasks, activity } = useCareLoop();
@@ -96,17 +97,7 @@ export function FamilyScreen() {
                 {/* Member Header */}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-base shadow-xs ${
-                        member.role === "OWNER"
-                          ? "bg-slate-900"
-                          : member.role === "CARE_COORDINATOR"
-                          ? "bg-teal-700"
-                          : "bg-emerald-600"
-                      }`}
-                    >
-                      {member.name.charAt(0)}
-                    </div>
+                    <FamilyAvatar name={member.name} size="md" />
                     <div>
                       <div className="flex items-center gap-2">
                         <h2 className="font-bold text-base text-slate-900">{member.name}</h2>
@@ -220,17 +211,7 @@ export function FamilyScreen() {
             {/* Dossier Header */}
             <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between shrink-0">
               <div className="flex items-center gap-4">
-                <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-lg ${
-                    selectedMember.role === "OWNER"
-                      ? "bg-slate-900"
-                      : selectedMember.role === "CARE_COORDINATOR"
-                      ? "bg-teal-700"
-                      : "bg-emerald-600"
-                  }`}
-                >
-                  {selectedMember.name.charAt(0)}
-                </div>
+                <FamilyAvatar name={selectedMember.name} size="lg" />
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-lg text-slate-900">{selectedMember.name}</h3>

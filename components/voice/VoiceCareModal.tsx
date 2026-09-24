@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import {
   PhoneCall,
+  Phone,
   Volume2,
   Mic,
   ShieldAlert,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   AlertTriangle,
   RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -30,14 +32,24 @@ interface VoiceCareModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultSimulateSymptom?: boolean;
+  targetMemberId?: string;
 }
 
 export function VoiceCareModal({
   isOpen,
   onClose,
   defaultSimulateSymptom = false,
+  targetMemberId = "mem-anita",
 }: VoiceCareModalProps) {
-  const { family, addTask, logActivity } = useCareLoop();
+  const { family, members, addTask, logActivity } = useCareLoop();
+
+  const targetMember =
+    members.find((m) => m.id === targetMemberId) ||
+    members.find((m) => m.id === "mem-anita") ||
+    members[0];
+  const targetName = targetMember?.name || "Anita Rao";
+  const targetPhone = targetMember?.emergencyContact?.phone || "+91 98490 12345";
+  const targetLocation = targetMember?.location?.split(",")[0] || "Jubilee Hills";
 
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [selectedLanguage, setSelectedLanguage] = useState<"te-IN" | "en-IN">("te-IN");
@@ -61,14 +73,14 @@ export function VoiceCareModal({
       setVoiceState("listening");
 
       const res = await gnaniVoiceProvider.initiateCall({
-        targetPhone: "+91 98490 12345",
-        recipientName: "Anita Rao",
+        targetPhone: targetPhone,
+        recipientName: targetName,
         language: selectedLanguage,
         contextPurpose: "MEDICATION_CHECK",
-        patientId: "mem-anita",
+        patientId: targetMember?.id || "mem-anita",
         promptNotes: isSymptom
-          ? "Check symptoms and morning condition."
-          : "Check Thyronorm stock and morning dose compliance.",
+          ? `Check symptoms and morning condition for ${targetName}.`
+          : `Check wellness and care compliance for ${targetName}.`,
         simulateSymptomConcern: isSymptom,
       });
 
@@ -96,10 +108,9 @@ export function VoiceCareModal({
           setVoiceState("escalated");
 
           addTask({
-            title: "URGENT: Review Acute Symptom Report (Anita Rao)",
-            description:
-              "Gnani Voice Check detected reported dizziness and lightheadedness. CareLoop blocked automated operations and escalated to human caregivers for clinical evaluation.",
-            familyMemberId: "mem-anita",
+            title: `URGENT: Review Acute Symptom Report (${targetName})`,
+            description: `Gnani Voice Check detected reported dizziness and lightheadedness for ${targetName}. CareLoop blocked automated operations and escalated to human caregivers for clinical evaluation.`,
+            familyMemberId: targetMember?.id || "mem-anita",
             ownerId: family?.primaryCoordinatorId || "mem-arjun",
             priority: "URGENT",
             dueDate: "Today",
@@ -113,8 +124,7 @@ export function VoiceCareModal({
             actionType: "VOICE_ESCALATION_TRIGGERED",
             entityType: "TASK",
             entityId: res.callId,
-            description:
-              "Voice check detected acute symptom concern (dizziness) reported by Anita Rao. CareLoop stopped automated workflows and escalated to family.",
+            description: `Voice check detected acute symptom concern (dizziness) reported by ${targetName}. CareLoop stopped automated workflows and escalated to family.`,
             whyExplanation:
               "Clinical Safety Boundary Rule: AI agents must never diagnose or interpret symptoms. Any reported acute concern triggers immediate human caregiver escalation.",
           });
@@ -130,22 +140,22 @@ export function VoiceCareModal({
   const getStateDescription = () => {
     switch (voiceState) {
       case "connecting":
-        return "Dialing Anita Rao in Jubilee Hills, Hyderabad (+91 98490 12345)...";
+        return `Connecting to ${targetName} in ${targetLocation} (${targetPhone})...`;
       case "listening":
         return `Listening... (Gnani.ai Speech Recognition active in ${selectedLanguage === "te-IN" ? "Telugu" : "Indian English"})`;
       case "processing":
         return "Understanding... CareLoop is analyzing conversation against family care plan...";
       case "responding":
-        return "CareLoop Voice Agent is speaking with Anita Rao...";
+        return `CareLoop is speaking with ${targetName}...`;
       case "escalated":
         return "CLINICAL SAFETY ESCALATION TRIGGERED: Physical symptom reported. Automated workflows stopped.";
       case "completed":
-        return "Call successfully completed. Medication stock logged and refill verified.";
+        return "Check-in completed. Medication stock logged and care plan verified.";
       case "error":
-        return "Call could not connect. Network retry available.";
+        return "Couldn't start the call. Network or provider unreachable.";
       case "idle":
       default:
-        return "Ready to initiate native-language wellness check call.";
+        return `Ready to start voice check-in with ${targetName}.`;
     }
   };
 
@@ -234,7 +244,7 @@ export function VoiceCareModal({
               {getStateDescription()}
             </h3>
             <p className="text-xs text-slate-400">
-              Target: Anita Rao (Mother) · Jubilee Hills, Hyderabad
+              Target: {targetName} ({targetMember?.relationship || "Family Member"}) · {targetLocation}
             </p>
           </div>
         </div>
@@ -259,7 +269,7 @@ export function VoiceCareModal({
                 >
                   <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
                     <span className="font-bold">
-                      {item.speaker === "AGENT" ? "CareLoop Voice Rail" : "Anita Rao (Recipient)"}
+                      {item.speaker === "AGENT" ? "CareLoop Voice Rail" : `${targetName} (Recipient)`}
                     </span>
                     <span className="font-mono">{item.timestamp}</span>
                   </div>
@@ -280,7 +290,7 @@ export function VoiceCareModal({
               </span>
             </div>
             <p className="text-xs text-slate-700 leading-relaxed">
-              Anita Rao reported dizziness upon standing. CareLoop has halted all automated actions, logged a formal provenance incident, and dispatched an urgent task to Arjun and Meera.
+              {targetName} reported dizziness upon standing. CareLoop has halted all automated actions, logged a formal provenance incident, and dispatched an urgent task to family coordinators.
             </p>
           </div>
         )}
@@ -299,31 +309,93 @@ export function VoiceCareModal({
             </label>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
             <Button variant="outline" size="sm" onClick={onClose}>
               Close
             </Button>
 
             {voiceState === "idle" && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => handleStartCall()}
-                className="bg-teal-700 hover:bg-teal-800 text-white font-bold"
-              >
-                <PhoneCall className="w-4 h-4 mr-1.5" />
-                <span>Start Call ({selectedLanguage === "te-IN" ? "Telugu" : "English"})</span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${targetPhone.replace(/\s+/g, "")}`}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  title="Open phone dialer on desktop/mobile"
+                >
+                  <Phone className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Call from phone</span>
+                </a>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleStartCall()}
+                  className="bg-teal-700 hover:bg-teal-800 text-white font-bold"
+                >
+                  <PhoneCall className="w-4 h-4 mr-1.5" />
+                  <span>Start voice check-in</span>
+                </Button>
+              </div>
+            )}
+
+            {voiceState === "connecting" && (
+              <Button variant="primary" size="sm" disabled className="bg-teal-700/80 text-white font-bold cursor-wait">
+                <PhoneCall className="w-4 h-4 mr-1.5 animate-spin" />
+                <span>Connecting...</span>
               </Button>
             )}
 
-            {(voiceState === "completed" || voiceState === "escalated" || voiceState === "error") && (
+            {(voiceState === "listening" || voiceState === "processing" || voiceState === "responding") && (
+              <Button variant="primary" size="sm" disabled className="bg-teal-700 text-white font-bold">
+                <Volume2 className="w-4 h-4 mr-1.5 animate-pulse" />
+                <span>CareLoop is speaking with {targetName.split(" ")[0]}</span>
+              </Button>
+            )}
+
+            {voiceState === "completed" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1 mr-1">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Check-in completed
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setVoiceState("idle")}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  <span>New check-in</span>
+                </Button>
+              </div>
+            )}
+
+            {voiceState === "error" && (
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${targetPhone.replace(/\s+/g, "")}`}
+                  className="px-3 py-1.5 rounded-lg bg-teal-50 border border-teal-300 text-teal-800 text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Phone className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Call from phone instead</span>
+                </a>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleStartCall()}
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  <span>Couldn&apos;t start the call — Retry</span>
+                </Button>
+              </div>
+            )}
+
+            {voiceState === "escalated" && (
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => setVoiceState("idle")}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                <span>Reset Simulation</span>
+                <span>Reset Check-in</span>
               </Button>
             )}
           </div>

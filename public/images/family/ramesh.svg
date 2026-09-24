@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg-ramesh" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff"/>
+      <stop offset="100%" stop-color="#bfdbfe"/>
+    </linearGradient>
+    <linearGradient id="shirt-ramesh" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e40af"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#bg-ramesh)" stroke="#3b82f6" stroke-width="2"/>
+
+  <!-- Neck & Shoulders -->
+  <rect x="52" y="68" width="16" height="18" rx="4" fill="#fcd34d" opacity="0.8"/>
+  <path d="M26 108 C28 84, 42 78, 60 78 C78 78, 92 84, 94 108 Z" fill="url(#shirt-ramesh)"/>
+  <path d="M52 78 L60 92 L68 78 Z" fill="#ffffff"/>
+
+  <!-- Silver Hair back -->
+  <ellipse cx="60" cy="46" rx="26" ry="24" fill="#94a3b8"/>
+
+  <!-- Head -->
+  <ellipse cx="60" cy="54" rx="22" ry="25" fill="#fde68a"/>
+
+  <!-- Hair front (receding silver hair) -->
+  <path d="M38 46 C42 34, 52 32, 60 33 C68 32, 78 34, 82 46 C76 40, 72 38, 60 38 C48 38, 44 40, 38 46 Z" fill="#cbd5e1"/>
+
+  <!-- Eyebrows (silver/grey) -->
+  <path d="M46 48 Q50 46 54 48" stroke="#64748b" stroke-width="1.8" fill="none"/>
+  <path d="M66 48 Q70 46 74 48" stroke="#64748b" stroke-width="1.8" fill="none"/>
+
+  <!-- Glasses -->
+  <rect x="44" y="52" width="12" height="9" rx="3" fill="none" stroke="#334155" stroke-width="1.6"/>
+  <rect x="64" y="52" width="12" height="9" rx="3" fill="none" stroke="#334155" stroke-width="1.6"/>
+  <line x1="56" y1="56" x2="64" y2="56" stroke="#334155" stroke-width="1.6"/>
+
+  <!-- Eyes -->
+  <circle cx="50" cy="56" r="1.5" fill="#0f172a"/>
+  <circle cx="70" cy="56" r="1.5" fill="#0f172a"/>
+
+  <!-- Moustache -->
+  <path d="M50 66 Q60 63 70 66 Q60 69 50 66 Z" fill="#94a3b8"/>
+
+  <!-- Smile -->
+  <path d="M54 70 Q60 73 66 70" fill="none" stroke="#92400e" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

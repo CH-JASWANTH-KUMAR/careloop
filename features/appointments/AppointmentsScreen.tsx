@@ -20,12 +20,21 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/utils";
 
 export function AppointmentsScreen() {
-  const { appointments, members, records, medications, completeAppointment } = useCareLoop();
+  const { appointments, members, records, medications, completeAppointment, activeUser } = useCareLoop();
   const [filterTab, setFilterTab] = useState<string>("UPCOMING");
+  const [customPatientFilter, setCustomPatientFilter] = useState<{ userId: string; filter: string } | null>(null);
   const [selectedApptForPrep, setSelectedApptForPrep] = useState<Appointment | null>(null);
   const [completionNotice, setCompletionNotice] = useState<string | null>(null);
 
+  const filterPatient =
+    customPatientFilter?.userId === activeUser?.id
+      ? customPatientFilter.filter
+      : activeUser?.role === "DEPENDENT"
+      ? activeUser.id
+      : "ALL";
+
   const filteredAppts = appointments.filter((a) => {
+    if (filterPatient !== "ALL" && a.patientId !== filterPatient) return false;
     if (filterTab === "UPCOMING") return a.status === "UPCOMING";
     if (filterTab === "COMPLETED") return a.status === "COMPLETED";
     if (filterTab === "FOLLOWUP_REQUIRED") return a.status === "FOLLOWUP_REQUIRED";
@@ -53,14 +62,25 @@ export function AppointmentsScreen() {
           </p>
         </div>
 
-        <Tabs
-          tabs={[
-            { id: "UPCOMING", label: "Upcoming", count: appointments.filter((a) => a.status === "UPCOMING").length },
-            { id: "ALL", label: "All Consultations", count: appointments.length },
-          ]}
-          activeTab={filterTab}
-          onChange={setFilterTab}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            tabs={[
+              { id: "ALL", label: "All Family", count: appointments.length },
+              { id: "mem-anita", label: "Anita", count: appointments.filter((a) => a.patientId === "mem-anita").length },
+              { id: "mem-ramesh", label: "Ramesh", count: appointments.filter((a) => a.patientId === "mem-ramesh").length },
+            ]}
+            activeTab={filterPatient}
+            onChange={(val) => setCustomPatientFilter({ userId: activeUser?.id || "", filter: val })}
+          />
+          <Tabs
+            tabs={[
+              { id: "UPCOMING", label: "Upcoming", count: appointments.filter((a) => (filterPatient === "ALL" || a.patientId === filterPatient) && a.status === "UPCOMING").length },
+              { id: "ALL", label: "All", count: appointments.filter((a) => filterPatient === "ALL" || a.patientId === filterPatient).length },
+            ]}
+            activeTab={filterTab}
+            onChange={setFilterTab}
+          />
+        </div>
       </div>
 
       {/* Completion Toast Notification */}

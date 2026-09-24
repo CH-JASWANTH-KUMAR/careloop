@@ -36,8 +36,16 @@ export function TaskEngineScreen() {
   } = useCareLoop();
 
   const [activeTab, setActiveTab] = useState<string>("ALL");
+  const [customMemberScope, setCustomMemberScope] = useState<{ userId: string; filter: string } | null>(null);
   const [selectedTaskForContext, setSelectedTaskForContext] = useState<Task | null>(null);
   const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<Task | null>(null);
+
+  const memberScope =
+    customMemberScope?.userId === activeUser?.id
+      ? customMemberScope.filter
+      : activeUser?.role === "DEPENDENT"
+      ? activeUser.id
+      : "ALL";
 
   // Delegation state
   const [delegatingTaskId, setDelegatingTaskId] = useState<string | null>(null);
@@ -71,6 +79,7 @@ export function TaskEngineScreen() {
   const [newApproverId, setNewApproverId] = useState("mem-anita");
 
   const filteredTasks = tasks.filter((t) => {
+    if (memberScope !== "ALL" && t.familyMemberId !== memberScope && t.ownerId !== memberScope) return false;
     if (activeTab === "NEEDS_ATTENTION") return t.status === "NEEDS_ATTENTION";
     if (activeTab === "WAITING_APPROVAL") return t.status === "WAITING_FOR_APPROVAL";
     if (activeTab === "IN_PROGRESS")
@@ -184,41 +193,54 @@ export function TaskEngineScreen() {
         </Button>
       </div>
 
-      {/* Tabs Filter */}
-      <Tabs
-        tabs={[
-          { id: "ALL", label: "All Tasks", count: tasks.length },
-          {
-            id: "NEEDS_ATTENTION",
-            label: "Needs Attention",
-            count: tasks.filter((t) => t.status === "NEEDS_ATTENTION").length,
-          },
-          {
-            id: "WAITING_APPROVAL",
-            label: "Waiting Approval",
-            count: tasks.filter((t) => t.status === "WAITING_FOR_APPROVAL").length,
-          },
-          {
-            id: "IN_PROGRESS",
-            label: "In Progress",
-            count: tasks.filter(
-              (t) => t.status === "IN_PROGRESS" || t.status === "WAITING_FOR_EXTERNAL"
-            ).length,
-          },
-          {
-            id: "ESCALATED",
-            label: "Escalated",
-            count: tasks.filter((t) => t.status === "ESCALATED").length,
-          },
-          {
-            id: "COMPLETED",
-            label: "Completed",
-            count: tasks.filter((t) => t.status === "COMPLETED").length,
-          },
-        ]}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-      />
+      {/* Perspective Scope and Status Filters */}
+      <div className="space-y-3">
+        <Tabs
+          tabs={[
+            { id: "ALL", label: "All Family Tasks", count: tasks.length },
+            { id: "mem-anita", label: "Anita (Mother)", count: tasks.filter(t => t.familyMemberId === "mem-anita" || t.ownerId === "mem-anita").length },
+            { id: "mem-ramesh", label: "Ramesh (Father)", count: tasks.filter(t => t.familyMemberId === "mem-ramesh" || t.ownerId === "mem-ramesh").length },
+            { id: "mem-arjun", label: "Arjun (Coordinator)", count: tasks.filter(t => t.familyMemberId === "mem-arjun" || t.ownerId === "mem-arjun").length },
+          ]}
+          activeTab={memberScope}
+          onChange={(val) => setCustomMemberScope({ userId: activeUser?.id || "", filter: val })}
+        />
+
+        <Tabs
+          tabs={[
+            { id: "ALL", label: "All", count: tasks.filter(t => memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope).length },
+            {
+              id: "NEEDS_ATTENTION",
+              label: "Needs Attention",
+              count: tasks.filter((t) => (memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope) && t.status === "NEEDS_ATTENTION").length,
+            },
+            {
+              id: "WAITING_APPROVAL",
+              label: "Waiting Approval",
+              count: tasks.filter((t) => (memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope) && t.status === "WAITING_FOR_APPROVAL").length,
+            },
+            {
+              id: "IN_PROGRESS",
+              label: "In Progress",
+              count: tasks.filter(
+                (t) => (memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope) && (t.status === "IN_PROGRESS" || t.status === "WAITING_FOR_EXTERNAL")
+              ).length,
+            },
+            {
+              id: "ESCALATED",
+              label: "Escalated",
+              count: tasks.filter((t) => (memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope) && t.status === "ESCALATED").length,
+            },
+            {
+              id: "COMPLETED",
+              label: "Completed",
+              count: tasks.filter((t) => (memberScope === "ALL" || t.familyMemberId === memberScope || t.ownerId === memberScope) && t.status === "COMPLETED").length,
+            },
+          ]}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
+      </div>
 
       {/* Tasks List */}
       <div className="space-y-3">

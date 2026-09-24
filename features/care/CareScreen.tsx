@@ -13,6 +13,7 @@ import { useCareLoop } from "@/providers/AppProvider";
 import { useCareContinuity } from "@/hooks/useCareContinuity";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Tabs } from "@/components/ui/Tabs";
 import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 
 export function CareScreen() {
@@ -22,6 +23,7 @@ export function CareScreen() {
     members,
     records,
     approveTask,
+    activeUser,
   } = useCareLoop();
 
   const {
@@ -33,30 +35,47 @@ export function CareScreen() {
   const [refillModalOpen, setRefillModalOpen] = useState(false);
   const [selectedMedId, setSelectedMedId] = useState("med-thyronorm");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [customMemberFilter, setCustomMemberFilter] = useState<{ userId: string; filter: string } | null>(null);
+
+  const filterMemberId =
+    customMemberFilter?.userId === activeUser?.id
+      ? customMemberFilter.filter
+      : activeUser?.role === "DEPENDENT"
+      ? activeUser.id
+      : "ALL";
+
+  const relevantTasks = tasks.filter(
+    (t) => filterMemberId === "ALL" || t.familyMemberId === filterMemberId || t.ownerId === filterMemberId
+  );
+  const relevantMeds = medications.filter(
+    (m) => filterMemberId === "ALL" || m.patientId === filterMemberId
+  );
 
   // 1. NEEDS APPROVAL: E.g. Thyronorm refill, tasks requiring authorization
-  const lowStockMeds = medications.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE");
-  const needsApprovalTasks = tasks.filter(
+  const lowStockMeds = relevantMeds.filter((m) => m.remainingDays <= 5 && m.status === "ACTIVE");
+  const needsApprovalTasks = relevantTasks.filter(
     (t) => t.status === "WAITING_FOR_APPROVAL" || (t.status === "NEEDS_ATTENTION" && t.requiresApproval)
   );
 
   // 2. IN PROGRESS: Active running tasks, deliveries
-  const inProgressTasks = tasks.filter(
+  const inProgressTasks = relevantTasks.filter(
     (t) =>
       t.status === "IN_PROGRESS" ||
       (t.status === "WAITING_FOR_EXTERNAL" && t.description.toLowerCase().includes("transit"))
   );
 
   // 3. WAITING: External dependencies (hospital reports, callbacks)
-  const waitingTasks = tasks.filter(
+  const waitingTasks = relevantTasks.filter(
     (t) =>
       t.status === "WAITING_FOR_EXTERNAL" &&
       !t.description.toLowerCase().includes("transit")
   );
-  const pendingRecords = records.filter((r) => r.pipelineStatus !== "VERIFIED");
+  const pendingRecords = records.filter(
+    (r) => r.pipelineStatus !== "VERIFIED" && (filterMemberId === "ALL" || r.patientId === filterMemberId)
+  );
 
   // 4. COMPLETED: Finished care pipelines
-  const completedTasks = tasks.filter((t) => t.status === "COMPLETED");
+  const completedTasks = relevantTasks.filter((t) => t.status === "COMPLETED");
 
   const handleOpenRefill = (medId: string) => {
     setSelectedMedId(medId);
@@ -123,6 +142,19 @@ export function CareScreen() {
             )}
           </Button>
         </div>
+      </div>
+
+      {/* Perspective Filter Tabs */}
+      <div className="flex items-center justify-between">
+        <Tabs
+          tabs={[
+            { id: "ALL", label: "All Family Workflows", count: tasks.length },
+            { id: "mem-anita", label: "Anita (Mother)", count: tasks.filter(t => t.familyMemberId === "mem-anita" || t.ownerId === "mem-anita").length },
+            { id: "mem-ramesh", label: "Ramesh (Father)", count: tasks.filter(t => t.familyMemberId === "mem-ramesh" || t.ownerId === "mem-ramesh").length },
+          ]}
+          activeTab={filterMemberId}
+          onChange={(val) => setCustomMemberFilter({ userId: activeUser?.id || "", filter: val })}
+        />
       </div>
 
       {/* MONITORING CARD */}

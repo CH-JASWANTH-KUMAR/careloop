@@ -272,7 +272,8 @@ export interface ActivityEvent {
     | "DOCUMENT_UPLOADED"
     | "DOCUMENT_VERIFIED"
     | "APPOINTMENT_COMPLETED"
-    | "CARE_CONTINUITY_HANDOVER";
+    | "CARE_CONTINUITY_HANDOVER"
+    | "EMERGENCY_ACCESS_GRANTED";
   entityType:
     | "TASK"
     | "RECORD"
@@ -280,7 +281,8 @@ export interface ActivityEvent {
     | "APPOINTMENT"
     | "AUTHORIZATION"
     | "SHIPMENT"
-    | "FAMILY";
+    | "FAMILY"
+    | "MEMBER";
   entityId: string;
   description: string;
   whyExplanation: string; // "Why did CareLoop do this?"

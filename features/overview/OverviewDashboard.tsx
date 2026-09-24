@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ArrowRight, History, AlertTriangle, Phone } from "lucide-react";
+import { CheckCircle2, ArrowRight, History, AlertTriangle, Phone, PhoneCall } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 import { RefillWorkflowModal } from "@/components/workflow/RefillWorkflowModal";
 import { PersonalizedGreeting } from "@/components/dashboard/PersonalizedGreeting";
@@ -14,6 +14,7 @@ import { CareTimeline } from "@/components/dashboard/CareTimeline";
 import { VoiceCareButton } from "@/components/voice/VoiceCareButton";
 import { VoiceCareModal } from "@/components/voice/VoiceCareModal";
 import { FamilyCarePlanModal } from "@/components/care/FamilyCarePlanModal";
+import { CareContinuityBanner } from "@/components/shared/CareContinuityBanner";
 
 export function OverviewDashboard() {
   const { activity, tasks, approveTask } = useCareLoop();
@@ -22,6 +23,7 @@ export function OverviewDashboard() {
   const [selectedMedId, setSelectedMedId] = useState<string>("med-thyronorm");
   const [carePlanMemberId, setCarePlanMemberId] = useState<string | null>(null);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceTargetMemberId, setVoiceTargetMemberId] = useState<string>("mem-anita");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleOpenRefill = (medId: string) => {
@@ -98,21 +100,26 @@ export function OverviewDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setVoiceTargetMemberId("mem-anita");
+                setVoiceModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <PhoneCall className="w-3.5 h-3.5" /> Start Voice Check-In (Anita)
+            </button>
             <a
               href="tel:+919849012345"
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs transition-colors flex items-center gap-1.5 border border-slate-300"
+              title="Open phone dialer on desktop/mobile"
             >
-              <Phone className="w-3.5 h-3.5" /> Call Anita (+91 98490 12345)
-            </a>
-            <a
-              href="tel:+919381188069"
-              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <Phone className="w-3.5 h-3.5" /> Call Arjun (+91 93811 88069)
+              <Phone className="w-3.5 h-3.5 text-slate-400" /> Call from phone (+91 98490 12345)
             </a>
             <Link
               href="/tasks"
-              className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-rose-900 font-semibold text-xs transition-colors border border-rose-300"
+              className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-rose-900 font-semibold text-xs transition-colors border border-rose-300"
             >
               View Escalation Details
             </Link>
@@ -120,20 +127,29 @@ export function OverviewDashboard() {
         </div>
       )}
 
+      {/* Care Continuity & Handover Alert Banner */}
+      <CareContinuityBanner />
+
       {/* 1. Personalized Greeting & Coordinator Context */}
       <PersonalizedGreeting onOpenRefillModal={handleOpenRefill} />
 
       {/* 2. Care Command Center & AI Care Brief */}
       <CareCommandCenter
         onOpenRefillModal={handleOpenRefill}
-        onOpenVoiceModal={() => setVoiceModalOpen(true)}
+        onOpenVoiceModal={(memberId?: string) => {
+          if (memberId) setVoiceTargetMemberId(memberId);
+          setVoiceModalOpen(true);
+        }}
       />
 
       {/* 3. Role-Specific Workspace Actions */}
       <RoleActionsWorkspace
         onOpenRefillModal={handleOpenRefill}
         onOpenCarePlanModal={(id) => setCarePlanMemberId(id)}
-        onOpenVoiceModal={() => setVoiceModalOpen(true)}
+        onOpenVoiceModal={(memberId?: string) => {
+          if (memberId) setVoiceTargetMemberId(memberId);
+          setVoiceModalOpen(true);
+        }}
       />
 
       {/* 4. Today's Care Situation */}
@@ -233,6 +249,7 @@ export function OverviewDashboard() {
       <VoiceCareModal
         isOpen={voiceModalOpen}
         onClose={() => setVoiceModalOpen(false)}
+        targetMemberId={voiceTargetMemberId}
       />
     </div>
   );

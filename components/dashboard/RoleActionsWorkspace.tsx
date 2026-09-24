@@ -17,7 +17,7 @@ import { useCoordinatorContext } from "@/hooks/useCoordinatorContext";
 interface RoleActionsWorkspaceProps {
   onOpenRefillModal: (medId: string) => void;
   onOpenCarePlanModal: (memberId: string) => void;
-  onOpenVoiceModal: () => void;
+  onOpenVoiceModal: (targetMemberId?: string) => void;
 }
 
 export function RoleActionsWorkspace({
@@ -103,7 +103,7 @@ export function RoleActionsWorkspace({
             icon: <Volume2 className="w-5 h-5 text-teal-600" />,
             badge: "Gnani.ai Speech",
             badgeVariant: "healthy",
-            onClick: onOpenVoiceModal,
+            onClick: () => onOpenVoiceModal("mem-anita"),
           },
           {
             id: "act-apt-anita",

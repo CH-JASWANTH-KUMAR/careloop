@@ -4,13 +4,14 @@ import React, { useState } from "react";
 import Image from "next/image";
 
 interface FamilyAvatarProps {
-  member: {
-    id: string;
+  member?: {
+    id?: string;
     name: string;
     relationship?: string;
     avatarColor?: string;
     role?: string;
   };
+  name?: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   showStatusDot?: boolean;
   statusVariant?: "healthy" | "warning" | "urgent" | "info" | "neutral" | "waiting";
@@ -51,6 +52,7 @@ const defaultMemberColors: Record<string, { bg: string; text: string }> = {
 
 export function FamilyAvatar({
   member,
+  name,
   size = "md",
   showStatusDot = false,
   statusVariant = "healthy",
@@ -58,10 +60,21 @@ export function FamilyAvatar({
 }: FamilyAvatarProps) {
   const [imageError, setImageError] = useState(false);
 
-  const firstName = member.name.split(" ")[0].toLowerCase();
-  const imagePath = `/images/family/${firstName}.png`;
+  const memberName = member?.name || name || "Family Member";
+  const memberId =
+    member?.id ||
+    (memberName.toLowerCase().includes("anita")
+      ? "mem-anita"
+      : memberName.toLowerCase().includes("ramesh")
+      ? "mem-ramesh"
+      : memberName.toLowerCase().includes("meera")
+      ? "mem-meera"
+      : "mem-arjun");
 
-  const initials = member.name
+  const firstName = memberName.split(" ")[0].toLowerCase();
+  const imagePath = `/images/family/${firstName}.svg`;
+
+  const initials = memberName
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -69,7 +82,7 @@ export function FamilyAvatar({
     .toUpperCase();
 
   const colorScheme =
-    defaultMemberColors[member.id] || {
+    defaultMemberColors[memberId] || {
       bg: "bg-slate-100 border-slate-300",
       text: "text-slate-800",
     };
@@ -82,8 +95,9 @@ export function FamilyAvatar({
         >
           <Image
             src={imagePath}
-            alt={member.name}
+            alt={memberName}
             fill
+            unoptimized
             sizes="56px"
             className="object-cover"
             onError={() => setImageError(true)}
@@ -92,7 +106,7 @@ export function FamilyAvatar({
       ) : (
         <div
           className={`rounded-full border font-semibold flex items-center justify-center select-none shadow-xs ${colorScheme.bg} ${colorScheme.text} ${sizeClasses[size]}`}
-          title={`${member.name} (${member.relationship || "Family Member"})`}
+          title={`${memberName} (${member?.relationship || "Family Member"})`}
         >
           {initials}
         </div>

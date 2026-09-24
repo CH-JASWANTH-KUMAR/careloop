@@ -2,47 +2,58 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowRight, ShieldAlert, Users } from "lucide-react";
+import { ArrowRight, UserCheck, Users } from "lucide-react";
 import { useCareLoop } from "@/providers/AppProvider";
 
 export function CareContinuityBanner() {
-  const { family, members, activeUser } = useCareLoop();
+  const { family, members, activeUser, tasks } = useCareLoop();
 
   if (!family || family.isCoordinatorAvailable) {
     return null;
   }
 
   const primaryCoord = members.find((m) => m.id === family.primaryCoordinatorId);
+  const pendingActionsCount = tasks.filter(
+    (t) => t.status === "AWAITING_AUTHORIZATION" || t.status === "WAITING_FOR_APPROVAL" || t.priority === "URGENT"
+  ).length;
+
+  const coordinatorName = primaryCoord?.name?.split(" ")[0] || "Arjun";
+  const successorName = activeUser.id !== family.primaryCoordinatorId ? activeUser.name.split(" ")[0] : "Meera";
 
   return (
-    <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border-2 border-amber-500/30 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-          <ShieldAlert className="w-5 h-5" />
+    <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/80 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 shadow-2xs">
+      <div className="flex items-start gap-3.5">
+        <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+          <UserCheck className="w-5 h-5" />
         </div>
-        <div>
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.2 rounded bg-amber-200/60 text-amber-900">
-              Care Continuity Alert
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-200 text-amber-900">
+              Care Continuity Protocol
             </span>
-            <span className="text-xs text-amber-800">
-              Coordinator {primaryCoord?.name || "Arjun"} is currently unavailable
+            <span className="text-xs font-semibold text-amber-900">
+              {coordinatorName} is currently unavailable
             </span>
           </div>
-          <h2 className="text-sm font-bold text-slate-900 mt-0.5">
-            Single Point of Failure Safeguard Active
+
+          <h2 className="text-sm font-bold text-slate-900">
+            {successorName} can temporarily take over family coordination
           </h2>
-          <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-            Healthcare coordination for Anita &amp; Ramesh requires an active family manager. As{" "}
-            <strong>{activeUser.name}</strong>, you have permission to review pending actions and temporarily take over coordination responsibility.
+
+          <p className="text-xs text-slate-700 max-w-2xl leading-relaxed">
+            {pendingActionsCount > 0 ? `${pendingActionsCount} pending family care actions` : "Ongoing care workflows"}{" "}
+            for Anita &amp; Ramesh will remain active. You can step in to authorize refills and appointment preparation while {coordinatorName} is away.
           </p>
         </div>
       </div>
 
       <Link href="/continuity" className="shrink-0 self-end sm:self-center">
-        <button className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
+        <button
+          type="button"
+          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+        >
           <Users className="w-3.5 h-3.5 text-teal-400" />
-          <span>Review &amp; Take Over</span>
+          <span>Review &amp; Accept Handover</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </Link>

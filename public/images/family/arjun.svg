@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg-arjun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#c7d2fe"/>
+    </linearGradient>
+    <linearGradient id="shirt-arjun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#bg-arjun)" stroke="#6366f1" stroke-width="2"/>
+
+  <!-- Neck & Shoulders -->
+  <rect x="52" y="68" width="16" height="18" rx="4" fill="#fcd34d" opacity="0.8"/>
+  <path d="M26 108 C28 84, 42 78, 60 78 C78 78, 92 84, 94 108 Z" fill="url(#shirt-arjun)"/>
+  <circle cx="60" cy="74" r="3" fill="#ffffff"/>
+
+  <!-- Modern Hair back -->
+  <ellipse cx="60" cy="46" rx="25" ry="24" fill="#0f172a"/>
+
+  <!-- Head -->
+  <ellipse cx="60" cy="54" rx="21" ry="24" fill="#fde68a"/>
+
+  <!-- Hair front (textured modern cut) -->
+  <path d="M38 46 C40 32, 54 28, 68 30 C76 31, 82 36, 82 46 C76 38, 64 36, 50 38 C42 40, 39 43, 38 46 Z" fill="#0f172a"/>
+
+  <!-- Eyebrows -->
+  <path d="M46 48 Q50 46 54 48" stroke="#1e293b" stroke-width="2" fill="none"/>
+  <path d="M66 48 Q70 46 74 48" stroke="#1e293b" stroke-width="2" fill="none"/>
+
+  <!-- Modern Glasses -->
+  <rect x="44" y="52" width="12" height="8.5" rx="2" fill="none" stroke="#0f172a" stroke-width="1.8"/>
+  <rect x="64" y="52" width="12" height="8.5" rx="2" fill="none" stroke="#0f172a" stroke-width="1.8"/>
+  <line x1="56" y1="56" x2="64" y2="56" stroke="#0f172a" stroke-width="1.8"/>
+
+  <!-- Eyes -->
+  <circle cx="50" cy="56" r="1.5" fill="#0f172a"/>
+  <circle cx="70" cy="56" r="1.5" fill="#0f172a"/>
+
+  <!-- Light Stubble Beard -->
+  <path d="M44 64 C46 75, 54 78, 60 78 C66 78, 74 75, 76 64" stroke="#475569" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/>
+
+  <!-- Friendly Smile -->
+  <path d="M54 67 Q60 71 66 67" fill="none" stroke="#92400e" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

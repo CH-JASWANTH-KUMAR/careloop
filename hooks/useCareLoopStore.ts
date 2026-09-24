@@ -1201,7 +1201,8 @@ export function useCareLoopStore() {
   const stableActivity     = mounted ? activity     : initialActivityEvents;
   const stableActiveUser   = mounted
     ? (members.find((m) => m.id === activeUserId) || members[2])
-    : (initialFamilyMembers.find((m) => m.id === activeUserId) || initialFamilyMembers[2]);
+    : initialFamilyMembers[2];
+  const stableActiveUserId = mounted ? activeUserId : initialFamilyMembers[2].id;
 
   return {
     mounted,
@@ -1213,7 +1214,7 @@ export function useCareLoopStore() {
     appointments: stableAppointments,
     activity:     stableActivity,
     activeUser:   stableActiveUser,
-    activeUserId,
+    activeUserId: stableActiveUserId,
     switchActiveUser,
     toggleCoordinatorAvailability,
     takeOverCareCoordination,

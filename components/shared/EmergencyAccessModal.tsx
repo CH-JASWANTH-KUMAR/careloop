@@ -26,7 +26,7 @@ export function EmergencyAccessModal({
   onClose,
   defaultMemberId = "mem-anita",
 }: EmergencyAccessModalProps) {
-  const { members, medications, records } = useCareLoop();
+  const { members, medications, records, activeUser, logActivity } = useCareLoop();
   const [selectedMemberId, setSelectedMemberId] = useState(defaultMemberId);
   const [copied, setCopied] = useState(false);
 
@@ -50,6 +50,16 @@ export function EmergencyAccessModal({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
+
+    logActivity({
+      actor: { id: activeUser.id, name: activeUser.name, type: "USER" },
+      actionType: "EMERGENCY_ACCESS_GRANTED",
+      entityType: "MEMBER",
+      entityId: selectedMember.id,
+      description: `${activeUser.name} accessed emergency medical profile for ${selectedMember.name} (${selectedMember.bloodGroup}).`,
+      whyExplanation:
+        "Emergency clinical dossier accessed for urgent triage / first responders. Action recorded with full provenance timestamp.",
+    });
   };
 
   if (!selectedMember) return null;
@@ -203,6 +213,17 @@ export function EmergencyAccessModal({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Deliberate Emergency Access Protocol & Audit Disclosure */}
+        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600 space-y-1">
+          <div className="flex items-center justify-between text-slate-800 font-semibold">
+            <span>Accessing as: {activeUser.name} ({activeUser.relationship})</span>
+            <span className="font-mono text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">TEMPORARY READ-ONLY</span>
+          </div>
+          <p className="text-slate-500 leading-relaxed">
+            Emergency medical access unlocks vital records, active prescriptions, and attending doctor contacts for triage purposes. Every export is recorded immutably in the family care audit journal.
+          </p>
         </div>
 
         {/* Modal Actions */}

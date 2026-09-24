@@ -32,13 +32,20 @@ const PIPELINE_STEPS: { status: DocumentPipelineStatus; label: string }[] = [
 ];
 
 export function HealthRecordsScreen() {
-  const { records, members, addRecord, updateRecordExtraction } = useCareLoop();
+  const { records, members, addRecord, updateRecordExtraction, activeUser } = useCareLoop();
   const [activeTab, setActiveTab] = useState<"VAULT" | "TIMELINE">("VAULT");
   const [selectedRecord, setSelectedRecord] = useState<HealthRecord | null>(null);
   const [filterType, setFilterType] = useState<string>("ALL");
-  const [filterPatient, setFilterPatient] = useState<string>("ALL");
+  const [customPatientFilter, setCustomPatientFilter] = useState<{ userId: string; filter: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const filterPatient =
+    customPatientFilter?.userId === activeUser?.id
+      ? customPatientFilter.filter
+      : activeUser?.role === "DEPENDENT"
+      ? activeUser.id
+      : "ALL";
 
   // Edit / Verification Form state inside Modal
   const [isEditingExtraction, setIsEditingExtraction] = useState(false);
@@ -251,7 +258,7 @@ export function HealthRecordsScreen() {
               {/* Patient Selector */}
               <select
                 value={filterPatient}
-                onChange={(e) => setFilterPatient(e.target.value)}
+                onChange={(e) => setCustomPatientFilter({ userId: activeUser?.id || "", filter: e.target.value })}
                 className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none"
                 aria-label="Filter records by patient"
               >

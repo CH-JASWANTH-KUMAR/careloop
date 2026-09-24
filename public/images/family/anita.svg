@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg-anita" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfdf5"/>
+      <stop offset="100%" stop-color="#a7f3d0"/>
+    </linearGradient>
+    <linearGradient id="sari-anita" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#bg-anita)" stroke="#10b981" stroke-width="2"/>
+  
+  <!-- Hair back -->
+  <circle cx="60" cy="52" r="32" fill="#334155"/>
+  <circle cx="60" cy="28" r="14" fill="#475569"/>
+
+  <!-- Neck & Shoulders -->
+  <rect x="52" y="68" width="16" height="18" rx="4" fill="#fcd34d" opacity="0.8"/>
+  <path d="M26 108 C28 84, 42 78, 60 78 C78 78, 92 84, 94 108 Z" fill="url(#sari-anita)"/>
+  <path d="M46 78 C54 84, 60 96, 62 108 L50 108 C46 98, 42 88, 38 82 Z" fill="#f59e0b" opacity="0.9"/>
+
+  <!-- Head -->
+  <ellipse cx="60" cy="54" rx="22" ry="25" fill="#fde68a"/>
+  
+  <!-- Hair front (parted with silver streaks) -->
+  <path d="M38 50 C40 34, 52 32, 60 38 C68 32, 80 34, 82 50 C76 42, 68 40, 60 42 C52 40, 44 42, 38 50 Z" fill="#475569"/>
+  <path d="M52 38 C56 34, 62 34, 66 38" stroke="#cbd5e1" stroke-width="1.5" fill="none"/>
+
+  <!-- Bindi -->
+  <circle cx="60" cy="48" r="2" fill="#dc2626"/>
+
+  <!-- Glasses -->
+  <rect x="44" y="52" width="12" height="9" rx="3" fill="none" stroke="#78350f" stroke-width="1.5"/>
+  <rect x="64" y="52" width="12" height="9" rx="3" fill="none" stroke="#78350f" stroke-width="1.5"/>
+  <line x1="56" y1="56" x2="64" y2="56" stroke="#78350f" stroke-width="1.5"/>
+
+  <!-- Eyes -->
+  <circle cx="50" cy="56" r="1.5" fill="#1e293b"/>
+  <circle cx="70" cy="56" r="1.5" fill="#1e293b"/>
+
+  <!-- Smile -->
+  <path d="M54 67 Q60 71 66 67" fill="none" stroke="#b45309" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
